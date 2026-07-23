@@ -1,0 +1,3257 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model AddonProducts {
+  id              String   @id @default(uuid())
+  name            String
+  description     String?
+  type            String   @default("credits")
+  creditsAmount  Int? @map("credits_amount")
+  stripePriceId String? @map("stripe_price_id")
+  priceCents     Int @map("price_cents")
+  currency        String   @default("usd")
+  isActive       Boolean  @default(true) @map("is_active")
+  metadata        Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @map("updated_at") @updatedAt
+
+  @@index([isActive])
+  @@index([isActive, type])
+  @@index([type])
+
+  userAddons UserAddons[]
+}
+
+model AiAgentAnalytics {
+  id                   String   @id @default(uuid())
+  agentId             String @map("agent_id")
+  organizationId      String @map("organization_id")
+  date                 DateTime
+  runsCount           Int      @default(0) @map("runs_count")
+  successCount        Int      @default(0) @map("success_count")
+  failureCount        Int      @default(0) @map("failure_count")
+  totalTokens         Int      @default(0) @map("total_tokens")
+  totalCost           Float    @default(0) @map("total_cost")
+  avgLatency          Float    @default(0) @map("avg_latency")
+  toolCalls           Int      @default(0) @map("tool_calls")
+  memoryRetrievals    Int      @default(0) @map("memory_retrievals")
+  knowledgeRetrievals Int      @default(0) @map("knowledge_retrievals")
+  avgResponseQuality Float? @map("avg_response_quality")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  @@unique([agentId, date])
+  @@index([agentId, date])
+  @@index([agentId])
+  @@index([date])
+  @@index([organizationId])
+}
+
+model AiAgentConversations {
+  id              String   @id @default(uuid())
+  agentId        String @map("agent_id")
+  runId          String? @map("run_id")
+  organizationId String @map("organization_id")
+  userId         String @map("user_id")
+  title           String?
+  metadata        Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @map("updated_at") @updatedAt
+
+  @@index([agentId])
+  @@index([agentId, updatedAt])
+  @@index([organizationId])
+  @@index([runId])
+  @@index([userId])
+}
+
+model AiAgentKnowledgeBases {
+  id                String   @id @default(uuid())
+  agentId          String @map("agent_id")
+  organizationId   String @map("organization_id")
+  userId           String @map("user_id")
+  name              String
+  description       String?
+  chunkingStrategy String? @map("chunking_strategy")
+  chunkSize        Int      @default(500) @map("chunk_size")
+  chunkOverlap     Int      @default(50) @map("chunk_overlap")
+  embeddingModel   String? @map("embedding_model")
+  metadata          Json?
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @map("updated_at") @updatedAt
+
+  @@index([agentId])
+  @@index([organizationId])
+  @@index([userId])
+}
+
+model AiAgentKnowledgeDocuments {
+  id                String   @id @default(uuid())
+  knowledgeBaseId String @map("knowledge_base_id")
+  organizationId   String @map("organization_id")
+  userId           String @map("user_id")
+  title             String
+  source            String
+  sourceType       String @map("source_type")
+  content           String
+  chunks            Json?
+  embedding         Json?
+  metadata          Json?
+  tokens            Int      @default(0)
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @map("updated_at") @updatedAt
+
+  @@index([knowledgeBaseId])
+  @@index([knowledgeBaseId, sourceType])
+  @@index([organizationId])
+  @@index([sourceType])
+  @@index([userId])
+}
+
+model AiAgentMemories {
+  id              String          @id @default(uuid())
+  agentId        String @map("agent_id")
+  runId          String? @map("run_id")
+  organizationId String @map("organization_id")
+  userId         String @map("user_id")
+  type            AgentMemoryType @default(SHORT_TERM)
+  key             String
+  content         String
+  summary         String?
+  tokens          Int             @default(0)
+  metadata        Json?
+  score           Float?          @default(0)
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime @map("updated_at") @updatedAt
+  expiresAt      DateTime? @map("expires_at")
+  embedding       String?
+
+  @@unique([agentId, key])
+  @@index([agentId])
+  @@index([agentId, key])
+  @@index([agentId, type])
+  @@index([expiresAt])
+  @@index([organizationId])
+  @@index([runId])
+  @@index([score])
+  @@index([type])
+  @@index([userId])
+}
+
+model AiAgentMessages {
+  id              String           @id @default(uuid())
+  conversationId String @map("conversation_id")
+  role            ConversationRole
+  content         String
+  toolCalls      Json? @map("tool_calls")
+  toolResults    Json? @map("tool_results")
+  tokens          Int              @default(0)
+  metadata        Json?
+  createdAt      DateTime         @default(now()) @map("created_at")
+
+  @@index([conversationId, createdAt])
+  @@index([conversationId])
+}
+
+model AiAgentRuns {
+  id              String    @id @default(uuid())
+  agentId        String @map("agent_id")
+  organizationId String @map("organization_id")
+  userId         String @map("user_id")
+  status          String    @default("PENDING")
+  triggerType    String? @map("trigger_type")
+  input           Json?
+  output          Json?
+  error           String?
+  startedAt      DateTime? @map("started_at")
+  completedAt    DateTime? @map("completed_at")
+  duration        Int?
+  tokensUsed     Int? @map("tokens_used")
+  cost            Float?
+  metadata        Json?
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime @map("updated_at") @updatedAt
+
+  @@index([agentId, createdAt])
+  @@index([agentId])
+  @@index([agentId, status])
+  @@index([organizationId, createdAt])
+  @@index([organizationId])
+  @@index([status])
+  @@index([userId])
+}
+
+model AiAgentSchedules {
+  id              String    @id @default(uuid())
+  agentId        String @map("agent_id")
+  organizationId String @map("organization_id")
+  userId         String @map("user_id")
+  cron            String
+  input           Json?
+  enabled         Boolean   @default(true)
+  lastFiredAt   DateTime? @map("last_fired_at")
+  nextRunAt     DateTime? @map("next_run_at")
+  metadata        Json?
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime @map("updated_at") @updatedAt
+
+  @@index([agentId, enabled])
+  @@index([agentId])
+  @@index([enabled])
+  @@index([nextRunAt])
+  @@index([organizationId])
+  @@index([userId])
+}
+
+model AiAgentTasks {
+  id                   String     @id @default(uuid())
+  agentId             String? @map("agent_id")
+  runId               String? @map("run_id")
+  parentTaskId       String? @map("parent_task_id")
+  assignedToAgentId String? @map("assigned_to_agent_id")
+  organizationId      String @map("organization_id")
+  userId              String @map("user_id")
+  title                String
+  description          String?
+  status               TaskStatus @default(PENDING)
+  priority             Int        @default(0)
+  input                Json?
+  output               Json?
+  error                String?
+  toolType            String? @map("tool_type")
+  toolConfig          Json? @map("tool_config")
+  result               Json?
+  startedAt           DateTime? @map("started_at")
+  completedAt         DateTime? @map("completed_at")
+  duration             Int?
+  metadata             Json?
+  createdAt           DateTime   @default(now()) @map("created_at")
+  updatedAt           DateTime @map("updated_at") @updatedAt
+
+  @@index([agentId])
+  @@index([agentId, status])
+  @@index([assignedToAgentId])
+  @@index([organizationId])
+  @@index([parentTaskId])
+  @@index([runId])
+  @@index([runId, status])
+  @@index([status])
+  @@index([userId])
+}
+
+model AiAgentTools {
+  id              String        @id @default(uuid())
+  agentId        String @map("agent_id")
+  organizationId String @map("organization_id")
+  userId         String @map("user_id")
+  type            AgentToolType
+  name            String
+  description     String?
+  config          Json          @default("{}")
+  enabled         Boolean       @default(true)
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime @map("updated_at") @updatedAt
+
+  @@unique([agentId, name])
+  @@index([agentId])
+  @@index([agentId, type])
+  @@index([organizationId])
+  @@index([type])
+  @@index([userId])
+}
+
+model AiAgentVersions {
+  id            String   @id @default(uuid())
+  agentId      String @map("agent_id")
+  version       Int
+  systemPrompt String? @map("system_prompt")
+  config        Json     @default("{}")
+  memoryConfig Json     @default("{}") @map("memory_config")
+  toolConfig   Json     @default("{}") @map("tool_config")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@unique([agentId, version])
+  @@index([agentId])
+  @@index([createdAt])
+}
+
+model AiAgents {
+  id                 String          @id @default(uuid())
+  organizationId    String @map("organization_id")
+  userId            String @map("user_id")
+  name               String
+  description        String?
+  systemPrompt      String? @map("system_prompt")
+  status             AgentStatus     @default(DRAFT)
+  visibility         AgentVisibility @default(ORGANIZATION)
+  model              String          @default("gpt-4")
+  provider           String          @default("openai")
+  temperature        Float           @default(0.7)
+  maxTokens         Int             @default(4096) @map("max_tokens")
+  memoryConfig      Json            @default("{}") @map("memory_config")
+  toolConfig        Json            @default("{}") @map("tool_config")
+  metadata           Json?
+  currentVersionId String? @map("current_version_id")
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime @map("updated_at") @updatedAt
+  deletedAt         DateTime? @map("deleted_at")
+
+  @@index([deletedAt])
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([status])
+  @@index([userId])
+  @@index([userId, status])
+}
+
+model AiCache {
+  id          String   @id @default(uuid())
+  promptHash String @map("prompt_hash")
+  voiceHash  String? @map("voice_hash")
+  brandHash  String? @map("brand_hash")
+  platform    String   @default("")
+  tone        String   @default("")
+  output      String
+  model       String   @default("")
+  tokensUsed Int      @default(0) @map("tokens_used")
+  createdAt  DateTime @default(now()) @map("created_at")
+  expiresAt  DateTime @map("expires_at")
+
+  @@unique([promptHash, platform, tone, voiceHash, brandHash])
+  @@index([expiresAt])
+}
+
+model AiJobSteps {
+  id           String          @id @default(uuid())
+  jobId       String @map("job_id")
+  step         String
+  status       AiJobStepStatus @default(PENDING)
+  message      String?
+  startedAt   DateTime? @map("started_at")
+  completedAt DateTime? @map("completed_at")
+  duration     Int?
+  metadata     Json?
+  createdAt   DateTime        @default(now()) @map("created_at")
+
+  job AiJobs @relation(fields: [jobId], references: [id])
+
+  @@index([jobId])
+  @@index([jobId, step])
+}
+
+model AiJobs {
+  id                 String      @id @default(uuid())
+  userId            String @map("user_id")
+  status             AiJobStatus @default(QUEUED)
+  provider           String      @default("morphllm")
+  model              String      @default("")
+  inputContent      String @map("input_content")
+  outputContent     String? @map("output_content")
+  outputFormat      String @map("output_format")
+  voiceProfileId   String? @map("voice_profile_id")
+  brandKitId       String? @map("brand_kit_id")
+  promptTemplate    String? @map("prompt_template")
+  promptVersion     Int         @default(1) @map("prompt_version")
+  templateVersion   Int         @default(1) @map("template_version")
+  providerVersion   String? @map("provider_version")
+  generationVersion Int         @default(1) @map("generation_version")
+  promptTokens      Int         @default(0) @map("prompt_tokens")
+  completionTokens  Int         @default(0) @map("completion_tokens")
+  totalTokens       Int         @default(0) @map("total_tokens")
+  estimatedCost     Float       @default(0) @map("estimated_cost")
+  duration           Int?
+  priority           Int         @default(0)
+  progress           Float       @default(0)
+  error              String?
+  retryCount        Int         @default(0) @map("retry_count")
+  maxRetries        Int         @default(4) @map("max_retries")
+  metadata           Json?
+  startedAt         DateTime? @map("started_at")
+  completedAt       DateTime? @map("completed_at")
+  cancelledAt       DateTime? @map("cancelled_at")
+  createdAt         DateTime    @default(now()) @map("created_at")
+  updatedAt         DateTime @map("updated_at") @updatedAt
+
+  steps AiJobSteps[]
+
+  @@index([provider, createdAt])
+  @@index([status, createdAt])
+  @@index([userId, createdAt])
+  @@index([userId])
+  @@index([userId, status])
+}
+
+model AiModels {
+  id              String            @id @default(uuid())
+  providerId     String @map("provider_id")
+  name            String
+  displayName    String @map("display_name")
+  capabilities    ModelCapability[]
+  contextWindow  Int               @default(4096) @map("context_window")
+  maxTokens      Int               @default(4096) @map("max_tokens")
+  costPerInput  Float             @default(0) @map("cost_per_input")
+  costPerOutput Float             @default(0) @map("cost_per_output")
+  costPerCached Float             @default(0) @map("cost_per_cached")
+  isEnabled      Boolean           @default(true) @map("is_enabled")
+  metadata        Json?
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime @map("updated_at") @updatedAt
+
+  @@unique([providerId, name])
+  @@index([capabilities])
+  @@index([contextWindow])
+  @@index([providerId])
+  @@index([providerId, isEnabled])
+}
+
+model AiProviderCosts {
+  id              String    @id @default(uuid())
+  providerId     String @map("provider_id")
+  model           String
+  costPerInput  Float     @default(0) @map("cost_per_input")
+  costPerOutput Float     @default(0) @map("cost_per_output")
+  costPerCached Float     @default(0) @map("cost_per_cached")
+  effectiveFrom  DateTime  @default(now()) @map("effective_from")
+  effectiveTo    DateTime? @map("effective_to")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  @@unique([providerId, model, effectiveFrom])
+  @@index([effectiveFrom])
+  @@index([model])
+  @@index([providerId])
+}
+
+model AiProviderEvents {
+  id          String   @id @default(uuid())
+  providerId String @map("provider_id")
+  eventType  String @map("event_type")
+  message     String
+  metadata    Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@index([eventType])
+  @@index([providerId, createdAt])
+  @@index([providerId])
+}
+
+model AiProviders {
+  id            String            @id @default(uuid())
+  name          String            @unique
+  displayName  String @map("display_name")
+  type          ProviderType
+  baseUrl      String? @map("base_url")
+  apiKey       String? @map("api_key")
+  defaultModel String @map("default_model")
+  models        String[]
+  capabilities  ModelCapability[]
+  priority      Int               @default(999)
+  isEnabled    Boolean           @default(true) @map("is_enabled")
+  config        Json?
+  metadata      Json?
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime @map("updated_at") @updatedAt
+
+  @@index([isEnabled])
+  @@index([priority])
+  @@index([type])
+  @@index([type, isEnabled])
+}
+
+model AiRequests {
+  id                String        @id @default(uuid())
+  organizationId   String @map("organization_id")
+  userId           String @map("user_id")
+  providerId       String @map("provider_id")
+  model             String
+  type              String        @default("chat")
+  promptTokens     Int           @default(0) @map("prompt_tokens")
+  completionTokens Int           @default(0) @map("completion_tokens")
+  cachedTokens     Int           @default(0) @map("cached_tokens")
+  totalTokens      Int           @default(0) @map("total_tokens")
+  estimatedCost    Float         @default(0) @map("estimated_cost")
+  latency           Int           @default(0)
+  status            RequestStatus @default(PENDING)
+  error             String?
+  requestedAt      DateTime      @default(now()) @map("requested_at")
+  completedAt      DateTime? @map("completed_at")
+  createdAt        DateTime      @default(now()) @map("created_at")
+
+  @@index([model])
+  @@index([organizationId, createdAt])
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([providerId])
+  @@index([providerId, status])
+  @@index([requestedAt])
+  @@index([status])
+  @@index([userId, createdAt])
+  @@index([userId])
+}
+
+model AiUsage {
+  id                String   @id @default(uuid())
+  organizationId   String @map("organization_id")
+  userId           String @map("user_id")
+  providerId       String @map("provider_id")
+  model             String
+  promptTokens     Int      @default(0) @map("prompt_tokens")
+  completionTokens Int      @default(0) @map("completion_tokens")
+  cachedTokens     Int      @default(0) @map("cached_tokens")
+  totalTokens      Int      @default(0) @map("total_tokens")
+  estimatedCost    Float    @default(0) @map("estimated_cost")
+  requestCount     Int      @default(0) @map("request_count")
+  date              DateTime
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  @@unique([organizationId, providerId, model, date])
+  @@index([date])
+  @@index([model])
+  @@index([organizationId, date])
+  @@index([organizationId])
+  @@index([providerId, date])
+  @@index([providerId])
+  @@index([userId])
+}
+
+model AiUsageDaily {
+  id                      String   @id @default(uuid())
+  organizationId         String? @map("organization_id")
+  providerId             String? @map("provider_id")
+  model                   String?
+  date                    DateTime
+  totalRequests          Int      @default(0) @map("total_requests")
+  successfulRequests     Int      @default(0) @map("successful_requests")
+  failedRequests         Int      @default(0) @map("failed_requests")
+  totalPromptTokens     Int      @default(0) @map("total_prompt_tokens")
+  totalCompletionTokens Int      @default(0) @map("total_completion_tokens")
+  totalCachedTokens     Int      @default(0) @map("total_cached_tokens")
+  totalTokens            Int      @default(0) @map("total_tokens")
+  totalCost              Float    @default(0) @map("total_cost")
+  averageLatency         Float    @default(0) @map("average_latency")
+  createdAt              DateTime @default(now()) @map("created_at")
+
+  @@index([date])
+  @@index([model])
+  @@index([organizationId, date])
+  @@index([organizationId])
+  @@index([providerId, date])
+  @@index([providerId])
+}
+
+model AnalyticsAlertEvents {
+  id              String    @id @default(uuid())
+  alertId        String @map("alert_id")
+  organizationId String @map("organization_id")
+  metric          String
+  value           Float
+  condition       String
+  threshold       Float
+  message         String
+  status          String    @default("triggered")
+  acknowledgedAt DateTime? @map("acknowledged_at")
+  resolvedAt     DateTime? @map("resolved_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  @@index([alertId])
+  @@index([organizationId])
+}
+
+model AnalyticsAlerts {
+  id                String    @id @default(uuid())
+  organizationId   String @map("organization_id")
+  userId           String @map("user_id")
+  name              String
+  description       String?
+  metric            String
+  condition         String
+  threshold         Float
+  window            Int       @default(300)
+  enabled           Boolean   @default(true)
+  channels          Json      @default("[]")
+  lastTriggeredAt DateTime? @map("last_triggered_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime @map("updated_at") @updatedAt
+
+  @@index([organizationId])
+}
+
+model AnalyticsBenchmarks {
+  id              String   @id @default(uuid())
+  organizationId String @map("organization_id")
+  userId         String @map("user_id")
+  name            String
+  description     String?
+  metric          String
+  period          String   @default("monthly")
+  groupBy         String?
+  filters         Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @map("updated_at") @updatedAt
+
+  @@index([organizationId])
+}
+
+model AnalyticsDashboards {
+  id              String   @id @default(uuid())
+  organizationId String @map("organization_id")
+  userId         String @map("user_id")
+  title           String
+  description     String?
+  config          Json     @default("{}")
+  layout          Json?
+  isDefault       Boolean  @default(false)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @map("updated_at") @updatedAt
+
+  @@index([organizationId])
+}
+
+model AnalyticsKpis {
+  id              String   @id @default(uuid())
+  organizationId String @map("organization_id")
+  userId         String @map("user_id")
+  name            String
+  description     String?
+  metric          String
+  formula         String?
+  unit            String?
+  target          Float?
+  warning         Float?
+  critical        Float?
+  direction       String   @default("up")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @map("updated_at") @updatedAt
+
+  @@index([organizationId])
+}
+
+model AnalyticsReports {
+  id                String    @id @default(uuid())
+  organizationId   String @map("organization_id")
+  userId           String @map("user_id")
+  title             String
+  description       String?
+  type              String    @default("custom")
+  config            Json      @default("{}")
+  filters           Json?
+  schedule          Json?
+  format            String?   @default("pdf")
+  lastGeneratedAt DateTime? @map("last_generated_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime @map("updated_at") @updatedAt
+
+  @@index([organizationId])
+}
+
+model AnalyticsSegments {
+  id              String   @id @default(uuid())
+  organizationId String @map("organization_id")
+  userId         String @map("user_id")
+  name            String
+  description     String?
+  type            String   @default("customer")
+  criteria        Json     @default("{}")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @map("updated_at") @updatedAt
+
+  @@index([organizationId])
+}
+
+model ApiKeys {
+  id              String    @id @default(uuid())
+  organizationId String @map("organization_id")
+  userId         String @map("user_id")
+  name            String
+  keyPrefix      String @map("key_prefix")
+  keyHash        String @map("key_hash")
+  permissions     String[]
+  scopes          String[]
+  allowedIps     String[] @map("allowed_ips")
+  lastUsedAt    DateTime? @map("last_used_at")
+  expiresAt      DateTime? @map("expires_at")
+  isActive       Boolean   @default(true) @map("is_active")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime @map("updated_at") @updatedAt
+  environment     String    @default("live")
+  dailyQuota     Int? @map("daily_quota")
+  monthlyQuota   Int? @map("monthly_quota")
+  dailyUsed      Int       @default(0) @map("daily_used")
+  monthlyUsed    Int       @default(0) @map("monthly_used")
+  quotaResetAt  DateTime? @map("quota_reset_at")
+
+  @@index([expiresAt])
+  @@index([keyHash])
+  @@index([organizationId])
+  @@index([organizationId, isActive])
+  @@index([userId])
+}
+
+model ApiRequestLogs {
+  id              String   @id @default(uuid())
+  organizationId String? @map("organization_id")
+  apiKeyId      String? @map("api_key_id")
+  userId         String? @map("user_id")
+  method          String
+  path            String
+  status          Int
+  latencyMs       Int @map("duration")
+  ipAddress      String? @map("ip_address")
+  userAgent      String? @map("user_agent")
+  requestId      String? @map("request_id")
+  idempotencyKey String? @map("idempotency_key")
+  rateLimited    Boolean  @default(false) @map("rate_limited")
+  error           String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([apiKeyId])
+  @@index([createdAt])
+  @@index([organizationId, createdAt])
+  @@index([organizationId])
+  @@index([path, createdAt])
+  @@index([status, createdAt])
+}
+
+model AuditLogs {
+  id         String     @id @default(uuid())
+  event      AuditEvent
+  userId    String? @map("user_id")
+  email      String?
+  ip         String?
+  userAgent String? @map("user_agent")
+  action     String
+  metadata   Json?
+  createdAt DateTime   @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@index([event])
+  @@index([userId, createdAt])
+  @@index([userId])
+}
+
+model BrandKits {
+  id                  String   @id @default(uuid())
+  companyName        String @map("company_name")
+  brandColors        String[] @map("brand_colors")
+  brandVoice         String @map("brand_voice")
+  logoUrl            String @map("logo_url")
+  userId             String @map("user_id")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @map("updated_at") @updatedAt
+  companyDescription String? @map("company_description")
+  targetAudience     String? @map("target_audience")
+  organizationId     String? @map("organization_id")
+
+  organization Organizations? @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+  @@index([userId])
+}
+
+model ComplianceConsents {
+  id           String   @id @default(uuid())
+  userId      String @map("user_id")
+  consentType String @map("consent_type")
+  granted      Boolean  @default(true)
+  ipAddress   String? @map("ip_address")
+  userAgent   String? @map("user_agent")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([userId, consentType])
+  @@index([userId])
+}
+
+model ContentTemplates {
+  id              String   @id @default(uuid())
+  name            String
+  description     String?
+  category        String   @default("general")
+  platform        String   @default("linkedin")
+  content         String
+  isCustom       Boolean  @default(false) @map("is_custom")
+  userId         String? @map("user_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @map("updated_at") @updatedAt
+  organizationId String? @map("organization_id")
+
+  organization Organizations? @relation(fields: [organizationId], references: [id])
+
+  @@index([category])
+  @@index([organizationId])
+  @@index([platform])
+  @@index([userId])
+}
+
+model CouponUsages {
+  id          String   @id @default(uuid())
+  couponId   String @map("coupon_id")
+  userId     String @map("user_id")
+  checkoutId String? @map("checkout_id")
+  amount      Int?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([couponId])
+  @@index([couponId, userId])
+  @@index([createdAt])
+  @@index([userId])
+}
+
+model Coupons {
+  id                String       @id @default(uuid())
+  code              String       @unique
+  discountType     DiscountType @map("discount_type")
+  discountValue    Float @map("discount_value")
+  maxUses          Int          @default(0) @map("max_uses")
+  usedCount        Int          @default(0) @map("used_count")
+  maxPerUser      Int          @default(1) @map("max_per_user")
+  planRestrictions Json? @map("plan_restrictions")
+  minAmount        Float? @map("min_amount")
+  maxAmount        Float? @map("max_amount")
+  startsAt         DateTime? @map("starts_at")
+  expiresAt        DateTime? @map("expires_at")
+  isActive         Boolean      @default(true) @map("is_active")
+  metadata          Json?
+  createdById     String? @map("created_by_id")
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime @map("updated_at") @updatedAt
+
+  @@index([code])
+  @@index([createdAt])
+  @@index([isActive, expiresAt])
+  @@index([isActive, startsAt, expiresAt])
+}
+
+model CreditBalances {
+  id         String   @id @default(uuid())
+  userId    String   @unique @map("user_id")
+  balance    Int      @default(0)
+  reserved   Int      @default(0)
+  updatedAt DateTime @map("updated_at") @updatedAt
+
+  @@index([balance])
+  @@index([balance, reserved])
+}
+
+model CreditPackages {
+  id              String   @id @default(uuid())
+  name            String
+  credits         Int
+  priceCents     Int @map("price_cents")
+  currency        String   @default("usd")
+  stripePriceId String? @map("stripe_price_id")
+  isActive       Boolean  @default(true) @map("is_active")
+  sortOrder      Int      @default(0) @map("sort_order")
+  metadata        Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @map("updated_at") @updatedAt
+
+  @@index([isActive, sortOrder])
+}
+
+model CreditTransactions {
+  id            String       @id @default(uuid())
+  userId       String @map("user_id")
+  amount        Int
+  balanceAfter Int          @default(0) @map("balance_after")
+  source        CreditSource
+  reference     String?
+  description   String?
+  metadata      Json?
+  expiresAt    DateTime? @map("expires_at")
+  createdAt    DateTime     @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@index([expiresAt])
+  @@index([reference])
+  @@index([source])
+  @@index([userId, createdAt])
+  @@index([userId])
+  @@index([userId, source])
+}
+
+model CustomerHealth {
+  id                    String   @id @default(uuid())
+  userId               String   @unique @map("user_id")
+  plan                  String   @default("free")
+  mrr                   Float    @default(0)
+  lifetimeValue        Float    @default(0) @map("lifetime_value")
+  daysActive           Int      @default(0) @map("days_active")
+  daysSinceLastLogin Int? @map("days_since_last_login")
+  totalGenerations     Int      @default(0) @map("total_generations")
+  totalPublishes       Int      @default(0) @map("total_publishes")
+  supportTickets       Int      @default(0) @map("support_tickets")
+  billingStatus        String   @default("ok") @map("billing_status")
+  healthScore          Float    @default(50) @map("health_score")
+  churnRisk            String   @default("low") @map("churn_risk")
+  npsScore             Int?     @default(0) @map("nps_score")
+  metadata              Json?
+  lastCalculatedAt    DateTime @default(now()) @map("last_calculated_at")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @map("updated_at") @updatedAt
+
+  @@index([churnRisk, healthScore])
+  @@index([churnRisk])
+  @@index([healthScore])
+  @@index([plan, mrr, churnRisk])
+  @@index([plan, mrr])
+}
+
+model DailyApiUsage {
+  id              String   @id @default(uuid())
+  organizationId String @map("organization_id")
+  apiKeyId      String? @map("api_key_id")
+  date            DateTime
+  requestCount   Int      @default(0) @map("request_count")
+  successCount   Int      @default(0) @map("success_count")
+  errorCount     Int      @default(0) @map("error_count")
+  totalDuration  Int      @default(0) @map("total_duration")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @map("updated_at") @updatedAt
+
+  @@unique([organizationId, apiKeyId, date])
+  @@index([apiKeyId, date])
+  @@index([organizationId, date])
+}
+
+model Embeddings {
+  id         String   @id @default(uuid())
+  chunkId   String @map("chunk_id")
+  model      String   @default("text-embedding-3-small")
+  vector     String
+  dimensions Int      @default(1536)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([chunkId])
+
+  chunk KnowledgeChunks @relation(fields: [chunkId], references: [id])
+}
+
+model Experiments {
+  id            String    @id @default(uuid())
+  name          String
+  description   String?
+  type          String    @default("provider")
+  enabled       Boolean   @default(false)
+  variants      Json      @default("[]")
+  metrics       Json?
+  winner        String?
+  createdById String @map("created_by_id")
+  startedAt     DateTime?
+  endedAt       DateTime?
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime @map("updated_at") @updatedAt
+
+  @@index([enabled])
+  @@index([type])
+}
+
+model FeatureAnnouncements {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  category    String   @default("release")
+  published   Boolean  @default(false)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @map("updated_at") @updatedAt
+
+  @@index([category])
+  @@index([published])
+}
+
+model FeatureFlags {
+  id          String           @id @default(uuid())
+  key         String           @unique
+  name        String
+  description String?
+  enabled     Boolean          @default(false)
+  scope       FeatureFlagScope @default(GLOBAL)
+  scopeId    String? @map("scope_id")
+  percentage  Int?             @default(100)
+  metadata    Json?
+  createdAt  DateTime         @default(now()) @map("created_at")
+  updatedAt  DateTime @map("updated_at") @updatedAt
+
+  @@index([key, enabled])
+  @@index([key])
+}
+
+model Feedback {
+  id         String       @id @default(uuid())
+  message    String
+  rating     Int?
+  metadata   String?
+  userId    String @map("user_id")
+  createdAt DateTime     @default(now()) @map("created_at")
+  type       FeedbackType @default(GENERAL)
+
+  @@index([type])
+  @@index([userId])
+  @@index([userId, type])
+}
+
+model Generations {
+  id                String    @id @default(uuid())
+  title             String?
+  sourceUrl        String? @map("source_url")
+  content           String
+  inputType        String? @map("input_type")
+  inputContent     String? @map("input_content")
+  extractedContent String? @map("extracted_content")
+  outputFormat     String? @map("output_format")
+  outputContent    String? @map("output_content")
+  tokensUsed       Int? @map("tokens_used")
+  modelUsed        String? @map("model_used")
+  isFavorite       Boolean   @default(false) @map("is_favorite")
+  userId           String @map("user_id")
+  voiceProfileId  String? @map("voice_profile_id")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  deletedAt        DateTime? @map("deleted_at")
+  platform          String?
+
+  user       Users?       @relation(fields: [userId], references: [id])
+  voiceProfile VoiceProfiles? @relation(fields: [voiceProfileId], references: [id])
+
+  @@index([deletedAt])
+  @@index([userId, createdAt])
+  @@index([userId])
+  @@index([userId, isFavorite])
+  @@index([userId, outputFormat])
+}
+
+model InstalledIntegrations {
+  id                   String            @id @default(uuid())
+  organizationId      String @map("organization_id")
+  userId              String? @map("user_id")
+  integrationKey      String @map("integration_key")
+  status               IntegrationStatus @default(DISCONNECTED)
+  config               Json              @default("{}")
+  lastSyncAt         DateTime? @map("last_sync_at")
+  lastSyncStatus     String? @map("last_sync_status")
+  lastError           String? @map("last_error")
+  lastHealthCheckAt DateTime? @map("last_health_check_at")
+  healthStatus        String? @map("health_status")
+  syncInterval        Int?              @default(0) @map("sync_interval")
+  isPaused            Boolean           @default(false) @map("is_paused")
+  version              String            @default("1.0.0")
+  metadata             Json?
+  createdAt           DateTime          @default(now()) @map("created_at")
+  updatedAt           DateTime @map("updated_at") @updatedAt
+
+  @@unique([organizationId, integrationKey])
+  @@index([healthStatus])
+  @@index([integrationKey])
+  @@index([lastSyncAt])
+  @@index([organizationId])
+  @@index([organizationId, integrationKey])
+  @@index([organizationId, isPaused])
+  @@index([organizationId, status])
+  @@index([status])
+}
+
+model IntegrationCategories {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  name        String
+  description String?
+  icon        String   @default("folder")
+  sortOrder  Int      @default(0) @map("sort_order")
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @map("updated_at") @updatedAt
+
+  @@index([isActive, sortOrder])
+  @@index([key])
+}
+
+model IntegrationCredentials {
+  id              String         @id @default(uuid())
+  installedId    String @map("installed_id")
+  organizationId String @map("organization_id")
+  type            CredentialType
+  label           String
+  encryptedValue String @map("encrypted_value")
+  keyIdentifier  String? @map("key_identifier")
+  expiresAt      DateTime? @map("expires_at")
+  lastUsedAt    DateTime? @map("last_used_at")
+  isActive       Boolean        @default(true) @map("is_active")
+  metadata        Json?
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime @map("updated_at") @updatedAt
+
+  @@index([expiresAt])
+  @@index([installedId])
+  @@index([installedId, isActive])
+  @@index([organizationId])
+}
+
+model IntegrationEvents {
+  id              String    @id @default(uuid())
+  installedId    String @map("installed_id")
+  organizationId String @map("organization_id")
+  eventType      String @map("event_type")
+  payload         Json
+  status          String    @default("pending")
+  processedAt    DateTime? @map("processed_at")
+  error           String?
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@index([eventType])
+  @@index([installedId, eventType])
+  @@index([installedId])
+  @@index([installedId, status])
+  @@index([organizationId])
+  @@index([status])
+}
+
+model IntegrationLogs {
+  id              String   @id @default(uuid())
+  installedId    String @map("installed_id")
+  organizationId String @map("organization_id")
+  level           String   @default("info")
+  message         String
+  details         Json?
+  source          String   @default("system")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@index([installedId, createdAt])
+  @@index([installedId])
+  @@index([installedId, level])
+  @@index([level])
+  @@index([organizationId])
+  @@index([organizationId, level])
+  @@index([source])
+}
+
+model IntegrationWebhooks {
+  id                String       @id @default(uuid())
+  installedId      String @map("installed_id")
+  organizationId   String @map("organization_id")
+  event             WebhookEvent
+  targetUrl        String @map("target_url")
+  secret            String?
+  isActive         Boolean      @default(true) @map("is_active")
+  lastTriggeredAt DateTime? @map("last_triggered_at")
+  failureCount     Int          @default(0) @map("failure_count")
+  metadata          Json?
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime @map("updated_at") @updatedAt
+
+  @@index([event])
+  @@index([installedId, event])
+  @@index([installedId])
+  @@index([installedId, isActive])
+  @@index([organizationId])
+}
+
+model Integrations {
+  id              String          @id @default(uuid())
+  key             String          @unique
+  name            String
+  description     String
+  version         String          @default("1.0.0")
+  icon            String          @default("puzzle")
+  type            IntegrationType
+  category        String
+  provider        String
+  isBuiltIn     Boolean         @default(true) @map("is_built_in")
+  isEnabled      Boolean         @default(true) @map("is_enabled")
+  hasOAuth        Boolean         @default(false) @map("has_oauth")
+  oauthProvider  OAuthProvider? @map("oauth_provider")
+  hasWebhooks    Boolean         @default(false) @map("has_webhooks")
+  configSchema   Json            @default("{}") @map("config_schema")
+  permissions     String[]
+  metadata        Json?
+  healthEndpoint String? @map("health_endpoint")
+  docsUrl        String? @map("docs_url")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime @map("updated_at") @updatedAt
+
+  @@index([category])
+  @@index([category, isEnabled])
+  @@index([isBuiltIn])
+  @@index([isEnabled])
+  @@index([key])
+  @@index([provider])
+  @@index([type])
+  @@index([type, isEnabled])
+}
+
+model Invoices {
+  id                 String        @id @default(uuid())
+  stripeInvoiceId  String        @unique @map("stripe_invoice_id")
+  amount             Int
+  currency           String        @default("usd")
+  pdfUrl            String? @map("pdf_url")
+  paidAt            DateTime? @map("paid_at")
+  periodStart       DateTime? @map("period_start")
+  periodEnd         DateTime? @map("period_end")
+  userId            String @map("user_id")
+  createdAt         DateTime      @default(now()) @map("created_at")
+  hostedInvoiceUrl String? @map("hosted_invoice_url")
+  stripeCustomerId String? @map("stripe_customer_id")
+  subscriptionId    String? @map("subscription_id")
+  status             InvoiceStatus @default(OPEN)
+
+  @@index([stripeInvoiceId])
+  @@index([subscriptionId])
+  @@index([userId])
+}
+
+model KnowledgeBases {
+  id                String   @id @default(uuid())
+  name              String
+  description       String?
+  organizationId   String @map("organization_id")
+  userId           String @map("user_id")
+  chunkingStrategy String? @map("chunking_strategy")
+  chunkSize        Int      @default(500) @map("chunk_size")
+  chunkOverlap     Int      @default(50) @map("chunk_overlap")
+  embeddingModel   String? @map("embedding_model")
+  metadata          Json?
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @map("updated_at") @updatedAt
+
+  documents KnowledgeDocuments[]
+
+  @@index([organizationId])
+  @@index([userId])
+}
+
+model KnowledgeChunks {
+  id          String   @id @default(uuid())
+  documentId String @map("document_id")
+  content     String
+  chunkIndex Int @map("chunk_index")
+  tokenCount Int      @default(0) @map("token_count")
+  metadata    Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  document KnowledgeDocuments @relation(fields: [documentId], references: [id])
+
+  embeddings Embeddings[]
+
+  @@unique([documentId, chunkIndex])
+  @@index([documentId])
+}
+
+model KnowledgeDocuments {
+  id                String                  @id @default(uuid())
+  knowledgeBaseId String @map("knowledge_base_id")
+  organizationId   String @map("organization_id")
+  userId           String @map("user_id")
+  title             String
+  source            String?
+  sourceType       String @map("source_type")
+  content           String
+  fileSize         Int? @map("file_size")
+  fileType         String? @map("file_type")
+  status            KnowledgeDocumentStatus @default(PROCESSING)
+  metadata          Json?
+  createdAt        DateTime                @default(now()) @map("created_at")
+  updatedAt        DateTime @map("updated_at") @updatedAt
+
+  chunks KnowledgeChunks[]
+
+  knowledgeBase KnowledgeBases @relation(fields: [knowledgeBaseId], references: [id])
+
+  @@index([knowledgeBaseId])
+  @@index([organizationId])
+  @@index([sourceType])
+  @@index([status])
+  @@index([userId])
+}
+
+model LifetimePlans {
+  id              String   @id @default(uuid())
+  name            String
+  description     String?
+  priceCents     Int @map("price_cents")
+  currency        String   @default("usd")
+  stripePriceId String? @map("stripe_price_id")
+  planTier       String   @default("pro") @map("plan_tier")
+  featureLimit   String? @map("feature_limit")
+  creditPack     Int      @default(0) @map("credit_pack")
+  isActive       Boolean  @default(true) @map("is_active")
+  metadata        Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @map("updated_at") @updatedAt
+
+  @@index([isActive])
+  @@index([isActive, planTier])
+  @@index([planTier])
+
+  userLifetimeDeals UserLifetimeDeals[]
+}
+
+model MarketplaceListings {
+  id                String            @id @default(uuid())
+  integrationKey   String            @unique @map("integration_key")
+  name              String
+  description       String
+  shortDescription String? @map("short_description")
+  category          String
+  icon              String            @default("puzzle")
+  images            String[]
+  provider          String
+  websiteUrl       String? @map("website_url")
+  docsUrl          String? @map("docs_url")
+  pricingUrl       String? @map("pricing_url")
+  supportUrl       String? @map("support_url")
+  privacyUrl       String? @map("privacy_url")
+  termsUrl         String? @map("terms_url")
+  status            MarketplaceStatus @default(DRAFT)
+  featured          Boolean           @default(false)
+  featuredUntil    DateTime? @map("featured_until")
+  installCount     Int               @default(0) @map("install_count")
+  reviewCount      Int               @default(0) @map("review_count")
+  averageRating    Float             @default(0) @map("average_rating")
+  isFree           Boolean           @default(true) @map("is_free")
+  priceCents       Int? @map("price_cents")
+  hasTrial         Boolean           @default(false) @map("has_trial")
+  trialDays        Int?              @default(0) @map("trial_days")
+  permissions       String[]
+  requirements      String[]
+  tags              String[]
+  metadata          Json?
+  developerId      String? @map("developer_id")
+  developerName    String? @map("developer_name")
+  developerEmail   String? @map("developer_email")
+  approvedAt       DateTime? @map("approved_at")
+  publishedAt      DateTime? @map("published_at")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime @map("updated_at") @updatedAt
+
+  @@index([averageRating])
+  @@index([category])
+  @@index([category, status])
+  @@index([createdAt])
+  @@index([developerId])
+  @@index([featured])
+  @@index([featured, status])
+  @@index([installCount])
+  @@index([integrationKey])
+  @@index([isFree])
+  @@index([status])
+  @@index([tags])
+}
+
+model MarketplaceReviews {
+  id              String   @id @default(uuid())
+  listingId      String @map("listing_id")
+  userId         String @map("user_id")
+  organizationId String @map("organization_id")
+  rating          Int
+  title           String?
+  content         String?
+  isVerified     Boolean  @default(false) @map("is_verified")
+  isEdited       Boolean  @default(false) @map("is_edited")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @map("updated_at") @updatedAt
+
+  @@unique([listingId, userId])
+  @@index([createdAt])
+  @@index([listingId])
+  @@index([listingId, rating])
+  @@index([organizationId])
+  @@index([userId])
+}
+
+model MfaMethods {
+  id           String    @id @default(uuid())
+  userId      String @map("user_id")
+  methodType  String @map("method_type")
+  secret       String?
+  confirmed    Boolean   @default(false)
+  backupCodes String[] @map("backup_codes")
+  lastUsedAt DateTime? @map("last_used_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime @map("updated_at") @updatedAt
+
+  @@index([userId])
+  @@index([userId, methodType])
+}
+
+model Notifications {
+  id         String   @id @default(uuid())
+  type       String   @default("info")
+  title      String
+  message    String
+  link       String?
+  read       Boolean  @default(false)
+  userId    String @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId, createdAt])
+  @@index([userId])
+  @@index([userId, read])
+}
+
+model OauthConnections {
+  id                 String        @id @default(uuid())
+  installedId       String @map("installed_id")
+  organizationId    String @map("organization_id")
+  provider           OAuthProvider
+  providerUserId   String? @map("provider_user_id")
+  providerUsername  String? @map("provider_username")
+  providerEmail     String? @map("provider_email")
+  accessToken       String @map("access_token")
+  refreshToken      String? @map("refresh_token")
+  idToken           String? @map("id_token")
+  tokenType         String        @default("Bearer") @map("token_type")
+  scope              String        @default("")
+  expiresAt         DateTime? @map("expires_at")
+  refreshExpiresAt DateTime? @map("refresh_expires_at")
+  tokenRotatedAt   DateTime? @map("token_rotated_at")
+  lastRefreshedAt  DateTime? @map("last_refreshed_at")
+  isRevoked         Boolean       @default(false) @map("is_revoked")
+  revokedAt         DateTime? @map("revoked_at")
+  metadata           Json?
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime @map("updated_at") @updatedAt
+
+  @@unique([installedId, provider])
+  @@index([expiresAt])
+  @@index([installedId])
+  @@index([isRevoked])
+  @@index([organizationId])
+  @@index([organizationId, provider])
+  @@index([provider])
+  @@index([providerUserId])
+  @@index([refreshExpiresAt])
+}
+
+model OrganizationAuditLogs {
+  id              String   @id @default(uuid())
+  organizationId String @map("organization_id")
+  actorId        String @map("actor_id")
+  action          String
+  entityType     String @map("entity_type")
+  entityId       String? @map("entity_id")
+  details         Json?
+  ipAddress      String? @map("ip_address")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([actorId])
+  @@index([entityType, entityId])
+  @@index([organizationId, action])
+  @@index([organizationId, createdAt])
+  @@index([organizationId])
+}
+
+model OrganizationInvitations {
+  id              String           @id @default(uuid())
+  email           String
+  role            Role             @default(EDITOR)
+  status          InvitationStatus @default(PENDING)
+  token           String           @unique
+  organizationId String @map("organization_id")
+  invitedById   String @map("invited_by_id")
+  expiresAt      DateTime @map("expires_at")
+  acceptedAt     DateTime? @map("accepted_at")
+  rejectedAt     DateTime? @map("rejected_at")
+  createdAt      DateTime         @default(now()) @map("created_at")
+
+  organization Organizations @relation(fields: [organizationId], references: [id])
+  invitedBy    Users         @relation(fields: [invitedById], references: [id])
+
+  @@index([email])
+  @@index([expiresAt])
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([status])
+  @@index([token])
+}
+
+model OrganizationMembers {
+  id              String   @id @default(uuid())
+  role            Role     @default(EDITOR)
+  organizationId String @map("organization_id")
+  userId         String @map("user_id")
+  invitedById   String? @map("invited_by_id")
+  joinedAt       DateTime @default(now()) @map("joined_at")
+  isSuspended    Boolean  @default(false) @map("is_suspended")
+
+  organization Organizations @relation(fields: [organizationId], references: [id])
+  user         Users         @relation(fields: [userId], references: [id])
+  invitedBy    Users?        @relation("OrganizationMemberInvitedBy", fields: [invitedById], references: [id])
+
+  @@unique([organizationId, userId])
+  @@index([organizationId])
+  @@index([organizationId, isSuspended])
+  @@index([role])
+  @@index([userId])
+}
+
+model Organizations {
+  id                       String   @id @default(uuid())
+  name                     String
+  slug                     String   @unique
+  logo                     String?
+  logoLight               String? @map("logo_light")
+  logoDark                String? @map("logo_dark")
+  favicon                  String?
+  plan                     String   @default("free")
+  maxSeats                 Int      @default(5)
+  timezone                 String   @default("UTC")
+  brandColor              String? @map("brand_color")
+  secondaryColor          String? @map("secondary_color")
+  accentColor             String? @map("accent_color")
+  customFont              String? @map("custom_font")
+  fontFamily              String? @map("font_family")
+  emailBrandingEnabled   Boolean  @default(false) @map("email_branding_enabled")
+  emailHeaderHtml        String? @map("email_header_html")
+  emailFooterHtml        String? @map("email_footer_html")
+  loadingScreenHtml      String? @map("loading_screen_html")
+  domain                   String?
+  domainVerified          Boolean  @default(false) @map("domain_verified")
+  domainVerificationCode String? @map("domain_verification_code")
+  sslStatus               String? @map("ssl_status")
+  isPrimaryDomain        Boolean  @default(false) @map("is_primary_domain")
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @map("updated_at") @updatedAt
+
+  members     OrganizationMembers[]
+  teams       Teams[]
+  departments Departments[]
+  brandKits  BrandKits[]
+  templates   ContentTemplates[]
+  invitations OrganizationInvitations[]
+
+  @@index([domain])
+  @@index([domainVerified])
+  @@index([slug])
+}
+
+model PrivacyRequests {
+  id           String    @id @default(uuid())
+  userId      String @map("user_id")
+  requestType String @map("request_type")
+  status       String    @default("pending")
+  details      Json?
+  completedAt DateTime? @map("completed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime @map("updated_at") @updatedAt
+
+  @@index([requestType])
+  @@index([status])
+  @@index([userId])
+}
+
+model PromptCategories {
+  id              String   @id @default(uuid())
+  name            String
+  description     String?
+  color           String   @default("#6366f1")
+  icon            String   @default("folder")
+  organizationId String @map("organization_id")
+  sortOrder      Int      @default(0) @map("sort_order")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @map("updated_at") @updatedAt
+
+  prompts PromptTemplates[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@index([organizationId, sortOrder])
+}
+
+model PromptExecutions {
+  id                String   @id @default(uuid())
+  promptId         String @map("prompt_id")
+  promptVersion    Int      @default(1) @map("prompt_version")
+  provider          String   @default("openai")
+  model             String   @default("gpt-4")
+  temperature       Float    @default(0.7)
+  topP             Float    @default(1) @map("top_p")
+  maxTokens        Int      @default(2048) @map("max_tokens")
+  systemPrompt     String? @map("system_prompt")
+  userPrompt       String @map("user_prompt")
+  output            String?
+  latency           Int?
+  promptTokens     Int      @default(0) @map("prompt_tokens")
+  completionTokens Int      @default(0) @map("completion_tokens")
+  totalTokens      Int      @default(0) @map("total_tokens")
+  estimatedCost    Float    @default(0) @map("estimated_cost")
+  rating            Int?
+  feedback          String?
+  success           Boolean  @default(true)
+  metadata          Json?
+  userId           String @map("user_id")
+  organizationId   String @map("organization_id")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  prompt PromptTemplates @relation(fields: [promptId], references: [id])
+
+  @@index([createdAt])
+  @@index([organizationId])
+  @@index([promptId, createdAt])
+  @@index([promptId])
+  @@index([provider, model])
+  @@index([userId])
+}
+
+model PromptFavorites {
+  id         String   @id @default(uuid())
+  promptId  String @map("prompt_id")
+  userId    String @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  prompt PromptTemplates @relation(fields: [promptId], references: [id])
+
+  @@unique([promptId, userId])
+  @@index([userId])
+}
+
+model PromptTemplates {
+  id              String       @id @default(uuid())
+  name            String
+  description     String?
+  content         String
+  status          PromptStatus @default(DRAFT)
+  categoryId     String? @map("category_id")
+  tags            String[]
+  version         Int          @default(1)
+  isFavorite     Boolean      @default(false) @map("is_favorite")
+  organizationId String @map("organization_id")
+  userId         String @map("user_id")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime @map("updated_at") @updatedAt
+  deletedAt      DateTime? @map("deleted_at")
+
+  category   PromptCategories? @relation(fields: [categoryId], references: [id])
+  variables  PromptVariables[]
+  versions   PromptVersions[]
+  executions PromptExecutions[]
+  favorites  PromptFavorites[]
+
+  @@index([deletedAt])
+  @@index([name])
+  @@index([organizationId, categoryId])
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([tags])
+  @@index([userId])
+}
+
+model PromptVariables {
+  id            String             @id @default(uuid())
+  promptId     String @map("prompt_id")
+  name          String
+  label         String?
+  type          PromptVariableType @default(STRING)
+  defaultValue String? @map("default_value")
+  required      Boolean            @default(false)
+  options       String[]
+  description   String?
+  sortOrder    Int                @default(0) @map("sort_order")
+  createdAt    DateTime           @default(now()) @map("created_at")
+
+  prompt PromptTemplates @relation(fields: [promptId], references: [id])
+
+  @@unique([promptId, name])
+  @@index([promptId])
+}
+
+model PromptVersions {
+  id            String   @id @default(uuid())
+  promptId     String @map("prompt_id")
+  version       Int
+  content       String
+  variables     Json?
+  status        String   @default("draft")
+  changeLog     String?
+  createdById String @map("created_by_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  prompt PromptTemplates @relation(fields: [promptId], references: [id])
+
+  @@unique([promptId, version])
+  @@index([promptId])
+}
+
+model ProviderHealth {
+  id                   String         @id @default(uuid())
+  provider             String         @unique
+  status               ProviderStatus @default(HEALTHY)
+  latency              Float          @default(0)
+  errorRate           Float          @default(0) @map("error_rate")
+  timeoutRate         Float          @default(0) @map("timeout_rate")
+  successRate         Float          @default(100) @map("success_rate")
+  avgCost             Float          @default(0) @map("avg_cost")
+  totalCalls          Int            @default(0) @map("total_calls")
+  lastLatency         Float? @map("last_latency")
+  lastErrorAt        DateTime? @map("last_error_at")
+  lastSuccessAt      DateTime? @map("last_success_at")
+  consecutiveFailures Int            @default(0) @map("consecutive_failures")
+  disabledAt          DateTime? @map("disabled_at")
+  createdAt           DateTime       @default(now()) @map("created_at")
+  updatedAt           DateTime @map("updated_at") @updatedAt
+
+  @@index([provider, status])
+  @@index([status])
+}
+
+model ReferralCodes {
+  id         String   @id @default(uuid())
+  userId    String   @unique @map("user_id")
+  code       String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([code])
+  @@index([userId])
+}
+
+model ReferralEvents {
+  id               String         @id @default(uuid())
+  inviterId       String @map("inviter_id")
+  inviteeId       String? @map("invitee_id")
+  inviteeEmail    String? @map("invitee_email")
+  referralCodeId String? @map("referral_code_id")
+  eventType       String @map("event_type")
+  status           ReferralStatus @default(PENDING)
+  metadata         Json?
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime @map("updated_at") @updatedAt
+
+  @@index([createdAt])
+  @@index([inviteeEmail])
+  @@index([inviteeId])
+  @@index([inviterId])
+  @@index([inviterId, status])
+  @@index([referralCodeId])
+  @@index([status, createdAt])
+}
+
+model ReferralLeaderboard {
+  id              String   @id @default(uuid())
+  userId         String   @unique @map("user_id")
+  totalReferrals Int      @default(0) @map("total_referrals")
+  convertedCount Int      @default(0) @map("converted_count")
+  totalCredits   Int      @default(0) @map("total_credits")
+  totalRevenue   Float    @default(0) @map("total_revenue")
+  rank            Int?
+  updatedAt      DateTime @map("updated_at") @updatedAt
+
+  @@index([convertedCount])
+  @@index([rank])
+  @@index([totalReferrals])
+  @@index([totalRevenue])
+}
+
+model ReferralPayouts {
+  id                String    @id @default(uuid())
+  userId           String @map("user_id")
+  referralEventId String @map("referral_event_id")
+  creditAmount     Int       @default(0) @map("credit_amount")
+  cashAmount       Float     @default(0) @map("cash_amount")
+  currency          String    @default("usd")
+  status            String    @default("pending")
+  paidAt           DateTime? @map("paid_at")
+  metadata          Json?
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  @@index([referralEventId])
+  @@index([status])
+  @@index([userId])
+  @@index([userId, status])
+}
+
+model ReferralRewards {
+  id         String     @id @default(uuid())
+  name       String
+  type       RewardType
+  value      Float
+  minPayout Float? @map("min_payout")
+  isActive  Boolean    @default(true) @map("is_active")
+  metadata   Json?
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime @map("updated_at") @updatedAt
+
+  @@index([isActive])
+}
+
+model RevenueMetrics {
+  id                   String   @id @default(uuid())
+  date                 DateTime @unique
+  mrr                  Float    @default(0)
+  arr                  Float    @default(0)
+  arpu                 Float    @default(0)
+  newMrr              Float    @default(0) @map("new_mrr")
+  churnMrr            Float    @default(0) @map("churn_mrr")
+  expansionMrr        Float    @default(0) @map("expansion_mrr")
+  totalCustomers      Int      @default(0) @map("total_customers")
+  activeSubscriptions Int      @default(0) @map("active_subscriptions")
+  churnedCount        Int      @default(0) @map("churned_count")
+  newCustomers        Int      @default(0) @map("new_customers")
+  refundAmount        Float    @default(0) @map("refund_amount")
+  creditSales         Float    @default(0) @map("credit_sales")
+  metadata             Json?
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  @@index([date])
+}
+
+model ScheduledPosts {
+  id             String     @id @default(uuid())
+  platform       Platform
+  content        String
+  scheduledAt   DateTime @map("scheduled_at")
+  status         PostStatus @default(PENDING)
+  userId        String @map("user_id")
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime @map("updated_at") @updatedAt
+  failureReason String? @map("failure_reason")
+  publishedAt   DateTime? @map("published_at")
+  retryCount    Int        @default(0) @map("retry_count")
+
+  @@index([status, scheduledAt])
+  @@index([userId])
+  @@index([userId, scheduledAt])
+  @@index([userId, status])
+}
+
+model SecurityAuditLogs {
+  id              String   @id @default(uuid())
+  organizationId String? @map("organization_id")
+  actorId        String? @map("actor_id")
+  actorEmail     String? @map("actor_email")
+  action          String
+  entityType     String @map("entity_type")
+  entityId       String? @map("entity_id")
+  oldValue        Json?
+  newValue        Json?
+  metadata        Json?
+  ipAddress      String? @map("ip_address")
+  country         String?
+  userAgent      String? @map("user_agent")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([action])
+  @@index([actorId])
+  @@index([createdAt])
+  @@index([entityType, entityId])
+  @@index([organizationId, action, createdAt])
+  @@index([organizationId, createdAt])
+  @@index([organizationId])
+}
+
+model SecurityPolicies {
+  id                       String   @id @default(uuid())
+  organizationId          String   @unique @map("organization_id")
+  minPasswordLength      Int      @default(8) @map("min_password_length")
+  requireUppercase        Boolean  @default(true) @map("require_uppercase")
+  requireLowercase        Boolean  @default(true) @map("require_lowercase")
+  requireNumbers          Boolean  @default(true) @map("require_numbers")
+  requireSymbols          Boolean  @default(false) @map("require_symbols")
+  passwordHistory         Int      @default(5) @map("password_history")
+  passwordExpiryDays     Int      @default(90) @map("password_expiry_days")
+  idleTimeoutMinutes     Int      @default(30) @map("idle_timeout_minutes")
+  sessionTimeoutHours    Int      @default(24) @map("session_timeout_hours")
+  maxFailedLogins        Int      @default(5) @map("max_failed_logins")
+  lockoutDurationMinutes Int      @default(15) @map("lockout_duration_minutes")
+  requireMfa              Boolean  @default(false) @map("require_mfa")
+  allowedCountries        String[] @map("allowed_countries")
+  allowedIps              String[] @map("allowed_ips")
+  trustedDomains          String[] @map("trusted_domains")
+  enforceForOrg          Boolean  @default(false) @map("enforce_for_org")
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @map("updated_at") @updatedAt
+}
+
+model SocialAccounts {
+  id                 String    @id @default(uuid())
+  provider           String
+  providerUserId   String @map("provider_user_id")
+  accessToken       String @map("access_token")
+  refreshToken      String? @map("refresh_token")
+  expiresAt         DateTime? @map("expires_at")
+  refreshExpiresAt DateTime? @map("refresh_expires_at")
+  scopes             String    @default("")
+  userId            String @map("user_id")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime @map("updated_at") @updatedAt
+
+  @@unique([provider, providerUserId])
+  @@index([provider])
+  @@index([userId])
+}
+
+model SsoDomains {
+  id                 String  @id @default(uuid())
+  organizationId    String @map("organization_id")
+  domain             String  @unique
+  verified           Boolean @default(false)
+  providerId        String? @map("provider_id")
+  verificationToken String? @map("verification_token")
+
+  @@index([organizationId])
+  @@index([organizationId, verified])
+}
+
+model SsoLoginEvents {
+  id              String   @id @default(uuid())
+  userId         String @map("user_id")
+  providerId     String? @map("provider_id")
+  organizationId String? @map("organization_id")
+  ipAddress      String? @map("ip_address")
+  userAgent      String? @map("user_agent")
+  success         Boolean  @default(true)
+  failureReason  String? @map("failure_reason")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@index([organizationId])
+  @@index([providerId])
+  @@index([success])
+  @@index([userId])
+}
+
+model SsoProviders {
+  id                String          @id @default(uuid())
+  organizationId   String @map("organization_id")
+  providerType     SSOProviderType @map("provider_type")
+  label             String
+  issuerUrl        String? @map("issuer_url")
+  clientId         String? @map("client_id")
+  clientSecret     String? @map("client_secret")
+  metadataUrl      String? @map("metadata_url")
+  metadataXml      String? @map("metadata_xml")
+  certificate       String?
+  enabled           Boolean         @default(true)
+  enforceForOrg   Boolean         @default(false) @map("enforce_for_org")
+  attributeMapping Json? @map("attribute_mapping")
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime @map("updated_at") @updatedAt
+
+  @@index([organizationId, enabled])
+  @@index([organizationId])
+}
+
+model SsoSessions {
+  id             String    @id @default(uuid())
+  userId        String @map("user_id")
+  providerId    String @map("provider_id")
+  idpSessionId String? @map("idp_session_id")
+  accessToken   String? @map("access_token")
+  refreshToken  String? @map("refresh_token")
+  expiresAt     DateTime? @map("expires_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  @@index([expiresAt])
+  @@index([providerId])
+  @@index([userId])
+}
+
+model SubscriptionEvents {
+  id              String   @id @default(uuid())
+  subscriptionId String? @map("subscription_id")
+  userId         String @map("user_id")
+  eventType      String @map("event_type")
+  previousPlan   String? @map("previous_plan")
+  newPlan        String? @map("new_plan")
+  amount          Int?
+  currency        String?  @default("usd")
+  metadata        Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@index([eventType])
+  @@index([userId, createdAt])
+  @@index([userId, eventType])
+  @@index([userId])
+}
+
+model Subscriptions {
+  id                   String             @id @default(uuid())
+  userId              String @map("user_id")
+  stripeId            String?            @unique @map("stripe_id")
+  stripePriceId      String? @map("stripe_price_id")
+  plan                 String
+  status               SubscriptionStatus @default(ACTIVE)
+  currentPeriodStart DateTime? @map("current_period_start")
+  currentPeriodEnd   DateTime? @map("current_period_end")
+  trialStart          DateTime? @map("trial_start")
+  trialEnd            DateTime? @map("trial_end")
+  cancelAtPeriodEnd Boolean            @default(false) @map("cancel_at_period_end")
+  canceledAt          DateTime? @map("canceled_at")
+  couponId            String? @map("coupon_id")
+  metadata             Json?
+  createdAt           DateTime           @default(now()) @map("created_at")
+  updatedAt           DateTime @map("updated_at") @updatedAt
+
+  @@index([cancelAtPeriodEnd, currentPeriodEnd])
+  @@index([createdAt])
+  @@index([plan, status])
+  @@index([status, currentPeriodEnd])
+  @@index([stripeId])
+  @@index([userId])
+  @@index([userId, status])
+}
+
+model SupportTickets {
+  id         String       @id @default(uuid())
+  subject    String
+  message    String
+  category   String       @default("general")
+  userId    String @map("user_id")
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime @map("updated_at") @updatedAt
+  status     TicketStatus @default(OPEN)
+
+  @@index([status])
+  @@index([userId])
+  @@index([userId, status])
+}
+
+model ThreatEvents {
+  id              String    @id @default(uuid())
+  organizationId String? @map("organization_id")
+  userId         String? @map("user_id")
+  threatType     String @map("threat_type")
+  severity        String    @default("low")
+  ipAddress      String? @map("ip_address")
+  userAgent      String? @map("user_agent")
+  country         String?
+  details         Json?
+  resolved        Boolean   @default(false)
+  resolvedAt     DateTime? @map("resolved_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@index([ipAddress])
+  @@index([organizationId])
+  @@index([organizationId, severity, createdAt])
+  @@index([severity])
+  @@index([threatType])
+}
+
+model UsageLog {
+  id               String   @id @default(uuid())
+  action           String
+  creditsConsumed Int      @default(1) @map("credits_consumed")
+  generationId    String? @map("generation_id")
+  userId          String @map("user_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([generationId])
+  @@index([userId, createdAt])
+  @@index([userId])
+}
+
+model UserAddons {
+  id                String   @id @default(uuid())
+  userId           String @map("user_id")
+  addonId          String @map("addon_id")
+  stripePaymentId String? @map("stripe_payment_id")
+  creditsAdded     Int      @default(0) @map("credits_added")
+  amountPaid       Int      @default(0) @map("amount_paid")
+  metadata          Json?
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  addon AddonProducts @relation(fields: [addonId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([userId])
+}
+
+model UserLifetimeDeals {
+  id                String             @id @default(uuid())
+  userId           String @map("user_id")
+  lifetimePlanId  String @map("lifetime_plan_id")
+  stripePaymentId String? @map("stripe_payment_id")
+  status            LifetimePlanStatus @default(ACTIVE)
+  activatedAt      DateTime           @default(now()) @map("activated_at")
+  expiresAt        DateTime? @map("expires_at")
+  metadata          Json?
+  createdAt        DateTime           @default(now()) @map("created_at")
+
+  lifetimePlan LifetimePlans @relation(fields: [lifetimePlanId], references: [id])
+
+  @@unique([userId, lifetimePlanId])
+  @@index([status])
+  @@index([userId])
+}
+
+model UserSessions {
+  id               String   @id @default(uuid())
+  userId          String @map("user_id")
+  token            String   @unique
+  ipAddress       String? @map("ip_address")
+  userAgent       String? @map("user_agent")
+  browser          String?
+  os               String?
+  device           String?
+  country          String?
+  city             String?
+  isTrusted       Boolean  @default(false) @map("is_trusted")
+  isBlocked       Boolean  @default(false) @map("is_blocked")
+  lastActivityAt DateTime @default(now()) @map("last_activity_at")
+  expiresAt       DateTime @map("expires_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([expiresAt])
+  @@index([token])
+  @@index([userId])
+  @@index([userId, isBlocked])
+  @@index([userId, lastActivityAt])
+}
+
+model UserWebhooks {
+  id              String    @id @default(uuid())
+  name            String    @default("Default")
+  url             String
+  secret          String?
+  triggerEvents  String[] @map("trigger_events")
+  isActive       Boolean   @default(true) @map("is_active")
+  retryCount     Int       @default(0) @map("retry_count")
+  lastSuccessAt DateTime? @map("last_success_at")
+  lastFailureAt DateTime? @map("last_failure_at")
+  lastError      String? @map("last_error")
+  userId         String @map("user_id")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime @map("updated_at") @updatedAt
+
+  @@index([userId])
+  @@index([userId, isActive])
+}
+
+model Users {
+  id                     String    @id @default(uuid())
+  email                  String    @unique
+  passwordHash          String    @default("") @map("password_hash")
+  name                   String?
+  fullName              String? @map("full_name")
+  avatarUrl             String? @map("avatar_url")
+  plan                   String    @default("free")
+  generationsUsed       Int       @default(0) @map("generations_used")
+  generationsLimit      Int       @default(3) @map("generations_limit")
+  stripeCustomerId     String? @map("stripe_customer_id")
+  stripeSubscriptionId String? @map("stripe_subscription_id")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime @map("updated_at") @updatedAt
+  notifyOnBilling      Boolean   @default(true) @map("notify_on_billing")
+  notifyOnGeneration   Boolean   @default(true) @map("notify_on_generation")
+  notifyOnSchedule     Boolean   @default(true) @map("notify_on_schedule")
+  onboardingCompleted   Boolean   @default(false) @map("onboarding_completed")
+  onboardingStep        String    @default("welcome") @map("onboarding_step")
+  timezone               String    @default("UTC")
+  lastUsageAlertSent  DateTime? @map("last_usage_alert_sent")
+
+  generations          Generations[]
+  voiceProfiles        VoiceProfiles[]
+  organizationMembers  OrganizationMembers[]
+  invitedMembers       OrganizationMembers[] @relation("OrganizationMemberInvitedBy")
+  invitedInvitations   OrganizationInvitations[]
+  teamMemberships      TeamMembers[]
+  ledTeams             Teams[]    @relation("TeamLead")
+  createdTeams         Teams[]    @relation("TeamCreatedBy")
+  headedDepartments    Departments[] @relation("DepartmentHead")
+  createdDepartments   Departments[] @relation("DepartmentCreatedBy")
+
+  @@index([email])
+  @@index([plan])
+  @@index([stripeCustomerId])
+  @@index([stripeSubscriptionId])
+  @@index([stripeSubscriptionId, plan])
+}
+
+model VoiceProfiles {
+  id            String   @id @default(uuid())
+  name          String
+  description   String?
+  tone          String   @default("casual")
+  examplePosts String[] @map("example_posts")
+  embedding     String?
+  isDefault    Boolean  @default(false) @map("is_default")
+  userId       String @map("user_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  isFavorite   Boolean  @default(false) @map("is_favorite")
+
+  user       Users        @relation(fields: [userId], references: [id])
+  generations Generations[]
+
+  @@index([userId])
+  @@index([userId, isDefault])
+  @@index([userId, isFavorite])
+}
+
+model WebhookDeliveries {
+  id              String    @id @default(uuid())
+  endpointId     String @map("endpoint_id")
+  eventType      String @map("event_type")
+  payload         Json
+  responseStatus Int? @map("response_status")
+  responseBody   String? @map("response_body")
+  duration        Int?
+  status          String    @default("pending")
+  attemptNumber  Int       @default(1) @map("attempt_number")
+  maxAttempts    Int       @default(3) @map("max_attempts")
+  nextRetryAt   DateTime? @map("next_retry_at")
+  completedAt    DateTime? @map("completed_at")
+  error           String?
+  ipAddress      String? @map("ip_address")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  @@index([endpointId])
+  @@index([endpointId, status])
+  @@index([eventType])
+  @@index([status, nextRetryAt])
+}
+
+model WebhookEndpoints {
+  id              String    @id @default(uuid())
+  organizationId String? @map("organization_id")
+  userId         String? @map("user_id")
+  name            String
+  url             String
+  secret          String?
+  triggerEvents  String[] @map("trigger_events")
+  isActive       Boolean   @default(true) @map("is_active")
+  description     String?
+  retryCount     Int       @default(3) @map("retry_count")
+  timeout         Int       @default(10)
+  lastSuccessAt DateTime? @map("last_success_at")
+  lastFailureAt DateTime? @map("last_failure_at")
+  lastError      String? @map("last_error")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime @map("updated_at") @updatedAt
+
+  @@index([organizationId])
+  @@index([organizationId, isActive])
+  @@index([userId])
+}
+
+model WebhookSecrets {
+  id              String    @id @default(uuid())
+  endpointId     String? @map("endpoint_id")
+  organizationId String? @map("organization_id")
+  secretHash     String @map("secret_hash")
+  secretPrefix   String @map("secret_prefix")
+  isActive       Boolean   @default(true) @map("is_active")
+  rotatedFromId String? @map("rotated_from_id")
+  rotatedAt      DateTime? @map("rotated_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  @@index([endpointId])
+  @@index([organizationId, isActive])
+}
+
+model WorkflowAuditLogs {
+  id          String   @id @default(uuid())
+  workflowId String @map("workflow_id")
+  action      String
+  details     Json?
+  userId     String @map("user_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([workflowId, createdAt])
+  @@index([workflowId])
+}
+
+model WorkflowEdges {
+  id             String    @id @default(uuid())
+  workflowId    String @map("workflow_id")
+  sourceNodeId String @map("source_node_id")
+  targetNodeId String @map("target_node_id")
+  sourceHandle  String? @map("source_handle")
+  targetHandle  String? @map("target_handle")
+  label          String?
+  config         Json?
+  deletedAt     DateTime? @map("deleted_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  @@index([deletedAt])
+  @@index([sourceNodeId])
+  @@index([targetNodeId])
+  @@index([workflowId])
+}
+
+model WorkflowExecutionLogs {
+  id            String   @id @default(uuid())
+  workflowId   String @map("workflow_id")
+  runId        String? @map("run_id")
+  level         String   @default("info")
+  message       String
+  metadata      Json?
+  createdById String @map("created_by_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@index([runId])
+  @@index([workflowId])
+  @@index([workflowId, level])
+}
+
+model WorkflowFavorites {
+  id          String   @id @default(uuid())
+  workflowId String @map("workflow_id")
+  userId     String @map("user_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@unique([workflowId, userId])
+  @@index([userId])
+}
+
+model WorkflowFolders {
+  id              String   @id @default(uuid())
+  name            String
+  organizationId String @map("organization_id")
+  createdById   String @map("created_by_id")
+  parentId       String? @map("parent_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @map("updated_at") @updatedAt
+
+  @@unique([organizationId, name, parentId])
+  @@index([organizationId])
+}
+
+model WorkflowNodes {
+  id          String           @id @default(uuid())
+  workflowId String @map("workflow_id")
+  type        WorkflowNodeType
+  label       String
+  config      Json             @default("{}")
+  positionX  Float            @default(0) @map("position_x")
+  positionY  Float            @default(0) @map("position_y")
+  width       Float            @default(200)
+  height      Float            @default(100)
+  metadata    Json?
+  deletedAt  DateTime? @map("deleted_at")
+  createdAt  DateTime         @default(now()) @map("created_at")
+  updatedAt  DateTime @map("updated_at") @updatedAt
+
+  @@index([deletedAt])
+  @@index([workflowId])
+}
+
+model WorkflowRunSteps {
+  id           String     @id @default(uuid())
+  runId       String @map("run_id")
+  nodeId      String? @map("node_id")
+  nodeType     String?
+  nodeLabel    String?
+  status       NodeStatus @default(IDLE)
+  input        Json?
+  output       Json?
+  error        String?
+  startedAt   DateTime? @map("started_at")
+  completedAt DateTime? @map("completed_at")
+  duration     Int?
+  retryCount  Int        @default(0) @map("retry_count")
+  metadata     Json?
+  createdAt   DateTime   @default(now()) @map("created_at")
+
+  run WorkflowRuns @relation(fields: [runId], references: [id])
+
+  @@index([nodeId])
+  @@index([runId])
+  @@index([runId, status])
+}
+
+model WorkflowRuns {
+  id            String    @id @default(uuid())
+  workflowId   String @map("workflow_id")
+  status        RunStatus @default(PENDING)
+  triggerType   String?
+  triggerData   Json?
+  startedAt    DateTime? @map("started_at")
+  completedAt  DateTime? @map("completed_at")
+  duration      Int?
+  error         String?
+  retryCount   Int       @default(0) @map("retry_count")
+  maxRetries   Int       @default(3) @map("max_retries")
+  metadata      Json?
+  createdById String @map("created_by_id")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime @map("updated_at") @updatedAt
+
+  workflow Workflows        @relation(fields: [workflowId], references: [id])
+  steps    WorkflowRunSteps[]
+
+  @@index([createdById])
+  @@index([status, createdAt])
+  @@index([workflowId])
+  @@index([workflowId, status])
+}
+
+model WorkflowTemplates {
+  id              String   @id @default(uuid())
+  name            String
+  description     String?
+  category        String   @default("general")
+  nodes           Json
+  edges           Json
+  variables       Json?
+  triggerType     String?
+  icon            String?
+  isBuiltIn     Boolean  @default(false) @map("is_built_in")
+  organizationId String? @map("organization_id")
+  createdById   String? @map("created_by_id")
+  usageCount     Int      @default(0) @map("usage_count")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @map("updated_at") @updatedAt
+
+  @@index([category])
+  @@index([isBuiltIn])
+  @@index([organizationId])
+}
+
+model WorkflowTriggers {
+  id            String      @id @default(uuid())
+  workflowId   String @map("workflow_id")
+  triggerType   TriggerType
+  config        Json        @default("{}")
+  enabled       Boolean     @default(true)
+  lastFiredAt DateTime? @map("last_fired_at")
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime @map("updated_at") @updatedAt
+
+  workflow Workflows @relation(fields: [workflowId], references: [id])
+
+  @@index([triggerType])
+  @@index([workflowId])
+}
+
+model WorkflowVariables {
+  id              String   @id @default(uuid())
+  workflowId     String? @map("workflow_id")
+  organizationId String? @map("organization_id")
+  name            String
+  value           String
+  isSecret       Boolean  @default(false) @map("is_secret")
+  scope           String   @default("workflow")
+  description     String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @map("updated_at") @updatedAt
+
+  @@unique([workflowId, name])
+  @@index([organizationId])
+  @@index([workflowId])
+}
+
+model WorkflowVersions {
+  id            String   @id @default(uuid())
+  workflowId   String @map("workflow_id")
+  version       Int
+  nodes         Json
+  edges         Json
+  metadata      Json?
+  createdById String @map("created_by_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@unique([workflowId, version])
+  @@index([workflowId])
+}
+
+model Workflows {
+  id                 String         @id @default(uuid())
+  name               String
+  description        String?
+  status             WorkflowStatus @default(DRAFT)
+  organizationId    String @map("organization_id")
+  createdById      String @map("created_by_id")
+  updatedById      String? @map("updated_by_id")
+  version            Int            @default(1)
+  currentVersionId String? @map("current_version_id")
+  folderId          String? @map("folder_id")
+  tags               String[]
+  isTemplate         Boolean        @default(false)
+  deletedAt         DateTime? @map("deleted_at")
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime @map("updated_at") @updatedAt
+
+  @@index([deletedAt])
+  @@index([organizationId, folderId])
+  @@index([organizationId])
+  @@index([organizationId, status])
+
+  runs WorkflowRuns[]
+  triggers WorkflowTriggers[]
+}
+
+enum AgentMemoryType {
+  SHORT_TERM
+  LONG_TERM
+  EPISODIC
+  SEMANTIC
+  CONVERSATION
+  SUMMARY
+}
+
+enum AgentStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  ARCHIVED
+  ERROR
+}
+
+enum AgentToolType {
+  WEB_SEARCH
+  CALCULATOR
+  DATABASE
+  HTTP_REQUEST
+  EMAIL
+  CALENDAR
+  FILE_STORAGE
+  CODE_EXECUTION
+  WEBHOOK
+  WORKFLOW
+  INTEGRATION
+  CUSTOM_API
+}
+
+enum AgentVisibility {
+  PRIVATE
+  ORGANIZATION
+  PUBLIC
+}
+
+enum AiJobStatus {
+  QUEUED
+  RUNNING
+  RETRYING
+  COMPLETED
+  CANCELLED
+  FAILED
+}
+
+enum AiJobStepStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  SKIPPED
+}
+
+enum AuditEvent {
+  AUTH_LOGIN
+  AUTH_LOGOUT
+  AUTH_FAILED
+  BILLING_CHANGED
+  BILLING_CANCELLED
+  GENERATION_CREATED
+  PUBLISHING_SCHEDULED
+  PUBLISHING_PUBLISHED
+  TEMPLATE_CREATED
+  TEMPLATE_UPDATED
+  TEMPLATE_DELETED
+  BRANDKIT_CREATED
+  BRANDKIT_UPDATED
+  ADMIN_ACTION
+  OAUTH_CONNECTED
+  OAUTH_DISCONNECTED
+  WEBHOOK_SENT
+  WEBHOOK_RECEIVED
+  WORKFLOW_RUN
+  WORKFLOW_CREATED
+  WORKFLOW_PUBLISHED
+  EXPORT_DOWNLOADED
+  SETTINGS_CHANGED
+}
+
+enum ConversationRole {
+  SYSTEM
+  USER
+  ASSISTANT
+  TOOL
+  FUNCTION
+}
+
+enum CredentialType {
+  OAUTH2
+  API_KEY
+  BASIC_AUTH
+  TOKEN
+  CUSTOM
+}
+
+enum CreditSource {
+  PURCHASED
+  USAGE
+  BONUS
+  REFERRAL
+  ADDON
+  PROMOTION
+  REFUND
+  EXPIRED
+  ADMIN
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED
+}
+
+enum FeatureFlagScope {
+  GLOBAL
+  PLAN
+  USER
+  ORGANIZATION
+}
+
+enum FeedbackType {
+  GENERAL
+  FEATURE_REQUEST
+  BUG_REPORT
+  NPS
+}
+
+enum IntegrationStatus {
+  DISCONNECTED
+  CONNECTED
+  ERROR
+  EXPIRED
+  REVOKED
+  PENDING
+}
+
+enum IntegrationType {
+  COMMUNICATION
+  STORAGE
+  PRODUCTIVITY
+  CRM
+  SOCIAL
+  CMS
+  AUTOMATION
+  AI
+  ANALYTICS
+  MARKETING
+  DEVELOPER_TOOLS
+  HR
+  FINANCE
+  OTHER
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  OPEN
+  PAID
+  VOID
+  UNCOLLECTIBLE
+}
+
+enum KnowledgeDocumentStatus {
+  PROCESSING
+  READY
+  FAILED
+}
+
+enum LifetimePlanStatus {
+  ACTIVE
+  EXPIRED
+  REFUNDED
+}
+
+enum MarketplaceStatus {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  ARCHIVED
+}
+
+enum ModelCapability {
+  CHAT
+  STREAM
+  VISION
+  EMBEDDING
+  AUDIO
+  IMAGE
+  CODE
+  REASONING
+  FUNCTION_CALLING
+}
+
+enum NodeStatus {
+  IDLE
+  WAITING
+  RUNNING
+  COMPLETED
+  FAILED
+  SKIPPED
+}
+
+enum OAuthProvider {
+  SLACK
+  DISCORD
+  NOTION
+  GOOGLE_DRIVE
+  DROPBOX
+  ONEDRIVE
+  BOX
+  HUBSPOT
+  SALESFORCE
+  PIPEDRIVE
+  TRELLO
+  ASANA
+  CLICKUP
+  JIRA
+  MONDAY
+  GITHUB
+  GITLAB
+  BITBUCKET
+  LINKEDIN
+  TWITTER
+  FACEBOOK
+  INSTAGRAM
+  YOUTUBE
+  TIKTOK
+  WORDPRESS
+  GHOST
+  MEDIUM
+  ZAPIER
+  MAKECOM
+  N8N
+  AIRTABLE
+  MICROSOFT_TEAMS
+  GENERIC
+}
+
+enum Platform {
+  LINKEDIN
+  TWITTER
+}
+
+enum PostStatus {
+  PENDING
+  PUBLISHED
+  FAILED
+}
+
+enum PromptStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum PromptVariableType {
+  STRING
+  NUMBER
+  BOOLEAN
+  SELECT
+  TEXTAREA
+}
+
+enum ProviderStatus {
+  HEALTHY
+  DEGRADED
+  UNHEALTHY
+  DISABLED
+}
+
+enum ProviderType {
+  OPENAI
+  ANTHROPIC
+  GOOGLE
+  MORPLLM
+  OPENROUTER
+  MISTRAL
+  GROQ
+  DEEPSEEK
+  AZURE
+  CUSTOM
+}
+
+enum ReferralStatus {
+  PENDING
+  CONVERTED
+  REWARDED
+  EXPIRED
+  FLAGGED
+}
+
+enum RequestStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+  TIMEOUT
+}
+
+enum RewardType {
+  CREDITS
+  CASH
+  PERCENTAGE
+  LIFETIME
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  MANAGER
+  EDITOR
+  VIEWER
+}
+
+enum RunStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+  TIMED_OUT
+  RETRYING
+}
+
+enum SSOProviderType {
+  GOOGLE
+  AZURE_AD
+  OKTA
+  AUTH0
+  OIDC
+  SAML
+  CUSTOM
+}
+
+enum ScimProviderType {
+  AZURE_AD
+  OKTA
+  GOOGLE
+  JUMPCLOUD
+  ONELOGIN
+  RIOT
+  GENERIC
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  EXPIRED
+  TRIALING
+  PAUSED
+}
+
+enum TaskStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+  BLOCKED
+  DELEGATED
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum Tone {
+  FORMAL
+  CASUAL
+  WITTY
+  AUTHORITATIVE
+  FRIENDLY
+}
+
+enum TriggerType {
+  MANUAL
+  CRON
+  WEBHOOK
+  GENERATION_FINISHED
+  SCHEDULED_EVENT
+  TEMPLATE_CREATED
+  BRAND_KIT_UPDATED
+}
+
+enum WebhookEvent {
+  INTEGRATION_CONNECTED
+  INTEGRATION_DISCONNECTED
+  INTEGRATION_ERROR
+  SYNC_STARTED
+  SYNC_COMPLETED
+  SYNC_FAILED
+  DATA_UPDATED
+  DATA_CREATED
+  DATA_DELETED
+}
+
+enum WorkflowNodeType {
+  TRIGGER
+  AI_GENERATE
+  AI_REWRITE
+  AI_SUMMARIZE
+  AI_TRANSLATE
+  AI_EXPAND
+  AI_SHORTEN
+  AI_OPTIMIZE
+  AI_TONE_CONVERT
+  CONDITION
+  DELAY
+  LOOP
+  MERGE
+  SPLIT
+  VARIABLE
+  FORMATTER
+  WEBHOOK
+  SOCIAL_PUBLISH
+  EMAIL
+  DATABASE
+  HTTP_REQUEST
+}
+
+enum WorkflowStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+  DISABLED
+}
+
+model Teams {
+  id              String   @id @default(uuid())
+  organizationId String @map("organization_id")
+  name            String
+  description     String?
+  leadId         String? @map("lead_id")
+  createdById    String @map("created_by_id")
+  memberCount    Int      @default(0) @map("member_count")
+  departmentId  String? @map("department_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @map("updated_at") @updatedAt
+
+  organization Organizations @relation(fields: [organizationId], references: [id])
+  lead         Users?        @relation("TeamLead", fields: [leadId], references: [id])
+  createdBy   Users         @relation("TeamCreatedBy", fields: [createdById], references: [id])
+  department  Departments?  @relation(fields: [departmentId], references: [id])
+  members     TeamMembers[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@index([organizationId, name])
+  @@index([departmentId])
+}
+
+model Departments {
+  id              String   @id @default(uuid())
+  organizationId String @map("organization_id")
+  name            String
+  description     String?
+  headId         String? @map("head_id")
+  createdById    String @map("created_by_id")
+  teamCount      Int      @default(0) @map("team_count")
+  memberCount    Int      @default(0) @map("member_count")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @map("updated_at") @updatedAt
+
+  organization Organizations @relation(fields: [organizationId], references: [id])
+  head         Users?        @relation("DepartmentHead", fields: [headId], references: [id])
+  createdBy   Users         @relation("DepartmentCreatedBy", fields: [createdById], references: [id])
+  teams       Teams[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@index([organizationId, name])
+}
+
+model TeamMembers {
+  id             String   @id @default(uuid())
+  teamId        String @map("team_id")
+  userId        String @map("user_id")
+  role           String   @default("member")
+  joinedAt      DateTime @default(now()) @map("joined_at")
+  organizationId String @map("organization_id")
+
+  team Teams @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user Users  @relation(fields: [userId], references: [id])
+
+  @@unique([teamId, userId])
+  @@index([teamId])
+  @@index([userId])
+  @@index([organizationId])
+}
+
+model AnalyticsKpiValues {
+  id           String   @id @default(uuid())
+  kpiId       String @map("kpi_id")
+  organizationId String @map("organization_id")
+  value        Float    @default(0)
+  target       Float?
+  recordedAt  DateTime @default(now()) @map("recorded_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([kpiId, recordedAt])
+  @@index([organizationId])
+}
+
+model AnalyticsAiMetrics {
+  id                String   @id @default(uuid())
+  organizationId   String @map("organization_id")
+  date              DateTime
+  providerId       String? @map("provider_id")
+  model             String?
+  requests          Int      @default(0)
+  successCount     Int      @default(0) @map("success_count")
+  failureCount     Int      @default(0) @map("failure_count")
+  promptSuccess    Int      @default(0) @map("prompt_success")
+  promptFailures   Int      @default(0) @map("prompt_failures")
+  knowledgeRetrievals Int   @default(0) @map("knowledge_retrievals")
+  ragAccuracy      Float    @default(0) @map("rag_accuracy")
+  workflowSuccess  Int      @default(0) @map("workflow_success")
+  agentSuccess     Int      @default(0) @map("agent_success")
+  totalTokens      Int      @default(0) @map("total_tokens")
+  totalCost        Float    @default(0) @map("total_cost")
+  avgLatency       Float    @default(0) @map("avg_latency")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  @@index([organizationId, date])
+  @@index([providerId, date])
+  @@index([model, date])
+  @@index([date])
+}
+
+model AnalyticsPerformanceSnapshots {
+  id              String   @id @default(uuid())
+  organizationId String? @map("organization_id")
+  capturedAt     DateTime @default(now()) @map("captured_at")
+  apiLatency      Float    @default(0) @map("api_latency")
+  dbQueries       Int      @default(0) @map("db_queries")
+  cacheHitRatio   Float    @default(0) @map("cache_hit_ratio")
+  queueProcessing Float    @default(0) @map("queue_processing")
+  backgroundJobs  Int      @default(0) @map("background_jobs")
+  searchPerformance Float  @default(0) @map("search_performance")
+  uploadPerformance Float  @default(0) @map("upload_performance")
+  responseTime    Float    @default(0) @map("response_time")
+  errorRate       Float    @default(0) @map("error_rate")
+  memoryUsage     Float    @default(0) @map("memory_usage")
+  cpuUsage        Float    @default(0) @map("cpu_usage")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([capturedAt])
+  @@index([organizationId, capturedAt])
+}
+
+model AnalyticsRealTimeEvents {
+  id              String   @id @default(uuid())
+  organizationId String @map("organization_id")
+  type            String
+  payload         Json
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([organizationId, createdAt])
+  @@index([type])
+}
+
+model AnalyticsCustomerLifetime {
+  id                String   @id @default(uuid())
+  organizationId   String @map("organization_id")
+  userId           String @map("user_id")
+  segment          String   @default("standard") @map("segment")
+  ltv              Float    @default(0)
+  cac              Float    @default(0)
+  paybackPeriod    Int      @default(0) @map("payback_period")
+  isPowerUser      Boolean  @default(false) @map("is_power_user")
+  isInactive       Boolean  @default(false) @map("is_inactive")
+  isExpansionCandidate Boolean @default(false) @map("is_expansion_candidate")
+  isEnterpriseProspect Boolean @default(false) @map("is_enterprise_prospect")
+  isTrialUser      Boolean  @default(false) @map("is_trial_user")
+  calculatedAt     DateTime @default(now()) @map("calculated_at")
+
+  @@unique([organizationId, userId])
+  @@index([organizationId, segment])
+  @@index([organizationId, isPowerUser])
+  @@index([organizationId, isTrialUser])
+  @@index([organizationId])
+}
+
+model ScimProviders {
+  id              String   @id @default(uuid())
+  organizationId String @map("organization_id")
+  providerType   ScimProviderType @map("provider_type")
+  baseUrl        String @map("base_url")
+  apiToken       String @map("api_token")
+  enabled        Boolean @default(true)
+  lastSyncedAt   DateTime? @map("last_synced_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @map("updated_at") @updatedAt
+
+  @@unique([organizationId, providerType])
+  @@index([organizationId])
+  @@index([providerType])
+}
+
+model ScimUsers {
+  id             String   @id @default(uuid())
+  providerId    String @map("provider_id")
+  externalId    String @map("external_id")
+  userName       String @map("user_name")
+  nameFormatted String? @map("name_formatted")
+  givenName     String? @map("given_name")
+  familyName    String? @map("family_name")
+  email          String?
+  active         Boolean  @default(true)
+  metadata       Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @map("updated_at") @updatedAt
+
+  @@unique([providerId, externalId])
+  @@index([providerId])
+  @@index([email])
+}
+
+model ScimGroups {
+  id          String   @id @default(uuid())
+  providerId String @map("provider_id")
+  externalId String @map("external_id")
+  name        String
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @map("updated_at") @updatedAt
+
+  @@unique([providerId, externalId])
+  @@index([providerId])
+}
+
+model ScimGroupMembers {
+  id        String @id @default(uuid())
+  groupId  String @map("group_id")
+  userId   String @map("user_id")
+  memberType String @default("User") @map("member_type")
+
+  @@unique([groupId, userId])
+  @@index([groupId])
+  @@index([userId])
+}
+
+model StripeConnectAccounts {
+  id                String   @id @default(uuid())
+  developerId      String @unique @map("developer_id")
+  stripeAccountId  String @unique @map("stripe_account_id")
+  accountType       String   @default("express") @map("account_type")
+  chargesEnabled    Boolean  @default(false) @map("charges_enabled")
+  payoutsEnabled    Boolean  @default(false) @map("payouts_enabled")
+  detailsSubmitted  Boolean  @default(false) @map("details_submitted")
+  totalEarnedCents  Int      @default(0) @map("total_earned_cents")
+  totalPayoutCents  Int      @default(0) @map("total_payout_cents")
+  status            String   @default("PENDING")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @map("updated_at") @updatedAt
+
+  @@index([stripeAccountId])
+  @@index([status])
+}
+
+model MarketplacePurchases {
+  id                   String   @id @default(uuid())
+  listingId           String @map("listing_id")
+  organizationId      String @map("organization_id")
+  stripeSessionId     String @unique @map("stripe_session_id")
+  stripePaymentIntentId String? @map("stripe_payment_intent_id")
+  amountCents          Int      @map("amount_cents")
+  feeCents             Int      @map("fee_cents")
+  status               String   @default("PENDING")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @map("updated_at") @updatedAt
+
+  @@index([listingId])
+  @@index([organizationId])
+  @@index([status])
+}
+
+model PushSubscriptions {
+  id              String   @id @default(uuid())
+  userId         String @map("user_id")
+  organizationId String @map("organization_id")
+  endpoint        String   @unique
+  p256dhKey       String @map("p256dh_key")
+  authKey         String @map("auth_key")
+  deviceType      String? @map("device_type")
+  userAgent       String?
+  isActive        Boolean  @default(true) @map("is_active")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @map("updated_at") @updatedAt
+
+  @@index([userId])
+  @@index([organizationId])
+  @@index([isActive])
+}
+
+model AiPrompts {
+  id              String   @id @default(uuid())
+  organizationId String @map("organization_id")
+  userId         String @map("user_id")
+  name            String
+  promptText     String @map("prompt_text")
+  version         Int      @default(1)
+  parentId       String? @map("parent_id")
+  metadata        Json?
+  isActive        Boolean  @default(true) @map("is_active")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @map("updated_at") @updatedAt
+
+  @@unique([organizationId, name, version])
+  @@index([organizationId])
+  @@index([userId])
+  @@index([parentId])
+}
+
+model AiPromptVersions {
+  id              String   @id @default(uuid())
+  promptId       String @map("prompt_id")
+  version         Int
+  promptText     String @map("prompt_text")
+  changeLog       String?
+  createdBy       String @map("created_by")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@unique([promptId, version])
+  @@index([promptId])
+}
+
+model AiMemoryEntries {
+  id              String   @id @default(uuid())
+  organizationId String @map("organization_id")
+  userId         String @map("user_id")
+  sessionId      String? @map("session_id")
+  role            String   @default("user")
+  content         String
+  metadata        Json?
+  tokenCount     Int? @map("token_count")
+  createdAt       DateTime @default(now()) @map("created_at")
+  expiresAt       DateTime? @map("expires_at")
+
+  @@index([organizationId, userId])
+  @@index([organizationId, sessionId])
+  @@index([userId])
+  @@index([sessionId])
+  @@index([expiresAt])
+}
+
+model AiPromptTemplates {
+  id              String   @id @default(uuid())
+  organizationId String @map("organization_id")
+  name            String
+  description     String?
+  category        String   @default("custom")
+  systemPrompt   String @map("system_prompt")
+  userTemplate   String @map("user_template")
+  variables       String[]
+  tags            String[]
+  isBuiltIn       Boolean  @default(false) @map("is_built_in")
+  usageCount      Int      @default(0) @map("usage_count")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @map("updated_at") @updatedAt
+
+  @@unique([organizationId, name])
+  @@index([organizationId, category])
+  @@index([organizationId, isBuiltIn])
+}

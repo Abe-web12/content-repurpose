@@ -1,0 +1,316 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version tag (e.g., v1.2.3)
+        required: true
+        type: string
+      pre-release:
+        description: Mark as pre-release
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: release-${{ github.ref || github.run_id }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "22"
+  NEXT_TELEMETRY_DISABLED: "1"
+  SENTRY_SUPPRESS_GLOBAL_ERROR_HANDLER_FILE_WARNING: "1"
+  SENTRY_RELEASE: ${{ github.ref_name }}
+
+jobs:
+  version:
+    name: Resolve Version
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+      is-pre-release: ${{ steps.resolve.outputs.pre-release }}
+      timestamp: ${{ steps.resolve.outputs.timestamp }}
+    steps:
+      - id: resolve
+        run: |
+          TAG="${{ github.event.inputs.version || github.ref_name }}"
+          TAG="${TAG#refs/tags/}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "pre-release=${{ github.event.inputs.pre-release || 'false' }}" >> "$GITHUB_OUTPUT"
+          echo "timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
+  release-notes:
+    name: Generate Release Notes
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: read
+    outputs:
+      notes: ${{ steps.notes.outputs.notes }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog
+        id: notes
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: releases } = await github.rest.repos.listReleases({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 1,
+            });
+            const lastTag = releases[0]?.tag_name;
+            const range = lastTag ? `${lastTag}..${context.ref}` : '';
+            const { data: commits } = await github.rest.repos.compareCommits({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              base: lastTag || context.payload.repository?.default_branch || 'main',
+              head: context.ref,
+            });
+            const notes = commits.commits
+              .filter(c => !c.commit.message.startsWith('Merge') && !c.commit.message.startsWith('chore'))
+              .map(c => `- ${c.commit.message.split('\n')[0]} (${c.sha.substring(0, 7)})`)
+              .join('\n');
+            core.setOutput('notes', notes || 'No changes since last release.');
+
+  build:
+    name: Build & Test
+    needs: [version, release-notes]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      next-standalone: ${{ steps.build-check.outputs.built }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build application
+        id: build-check
+        run: |
+          npm run build
+          echo "built=true" >> "$GITHUB_OUTPUT"
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_APP_URL: ${{ vars.NEXT_PUBLIC_APP_URL }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-build
+          path: |
+            .next/
+            public/
+            package.json
+            Dockerfile
+            docker-compose.prod.yml
+            docker-entrypoint.sh
+            prisma/
+          retention-days: 30
+
+  docker:
+    name: Build & Push Docker Image
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ !needs.version.outputs.is-pre-release }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            NEXT_PUBLIC_APP_URL=${{ vars.NEXT_PUBLIC_APP_URL }}
+            NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+            SENTRY_ORG=${{ secrets.SENTRY_ORG }}
+            SENTRY_PROJECT=${{ secrets.SENTRY_PROJECT }}
+
+      - name: Scan image for vulnerabilities
+        uses: aquasecurity/trivy-action@0.29.0
+        with:
+          image-ref: ghcr.io/${{ github.repository }}:${{ needs.version.outputs.tag }}
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+          exit-code: 1
+          hide-progress: true
+
+      - name: Upload scan results
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
+          category: docker-release
+
+  sentry:
+    name: Create Sentry Release
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create Sentry release
+        uses: getsentry/action-release@v3
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+        with:
+          environment: production
+          version: ${{ needs.version.outputs.tag }}
+          sourcemaps: .next/static/chunks
+          url_prefix: ~/_next/static/chunks
+
+  github-release:
+    name: Create GitHub Release
+    needs: [version, release-notes, build, docker, sentry]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-build
+          path: release-artifacts
+
+      - name: Create tarball
+        run: |
+          cd release-artifacts
+          tar -czf ../repurpose-ai-${{ needs.version.outputs.tag }}.tar.gz .
+          cd ..
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.version.outputs.tag }}
+          name: Release ${{ needs.version.outputs.tag }}
+          body: |
+            ## Release ${{ needs.version.outputs.tag }}
+
+            **Released:** ${{ needs.version.outputs.timestamp }}
+
+            ### Changelog
+            ${{ needs.release-notes.outputs.notes }}
+
+            ### Docker Images
+            - `ghcr.io/${{ github.repository }}:${{ needs.version.outputs.tag }}`
+            - `ghcr.io/${{ github.repository }}:latest`
+
+            ### Artifacts
+            - Source code (ZIP)
+            - Build tarball: `repurpose-ai-${{ needs.version.outputs.tag }}.tar.gz`
+          files: |
+            repurpose-ai-${{ needs.version.outputs.tag }}.tar.gz
+          prerelease: ${{ needs.version.outputs.is-pre-release == 'true' }}
+          generate_release_notes: false
+          make_latest: true
+
+  deploy:
+    name: Production Deploy
+    needs: [version, github-release]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: ${{ vars.NEXT_PUBLIC_APP_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: "--prod --prebuilt"
+          scope: ${{ secrets.VERCEL_ORG_ID }}
+
+  verify:
+    name: Deploy Verification
+    needs: deploy
+    runs-on: ubuntu-latest
+    if: always()
+    timeout-minutes: 10
+    steps:
+      - name: Wait for propagation
+        run: sleep 45
+
+      - name: Health check
+        run: |
+          STATUS=$(curl -sf -o /dev/null -w "%{http_code}" --retry 5 --retry-delay 15 \
+            "https://${{ vars.NEXT_PUBLIC_APP_URL }}/api/health" || echo "failed")
+          if [ "$STATUS" != "200" ]; then
+            echo "Health check returned $STATUS — rolling back..."
+            exit 1
+          fi
+          echo "Deployment verified successfully"
+
+      - name: Post-deployment smoke test
+        run: |
+          curl -sf "https://${{ vars.NEXT_PUBLIC_APP_URL }}" -o /dev/null
+          echo "Application serving correctly"

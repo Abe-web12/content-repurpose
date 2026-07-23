@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["esnext"],
+    "types": ["node"],
+    "moduleResolution": "node",
+    "module": "commonjs",
+    "target": "ES2018",
+    "noEmit": true
+  },
+  "include": ["extension/**/*.ts"],
+  "exclude": ["node_modules"]
+}
+

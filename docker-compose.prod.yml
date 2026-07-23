@@ -1,0 +1,103 @@
+# =============================================================================
+# RepurposeAI — Production Stack
+# =============================================================================
+#
+# This compose file is intended for single-server production deployments.
+# For multi-server or Kubernetes deployments, see DEPLOYMENT.md.
+#
+# Usage:
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# Required environment variables:
+#   DATABASE_URL         PostgreSQL connection string (managed service like Neon)
+#   REDIS_URL            Redis connection string (managed service like Upstash)
+#   CLERK_SECRET_KEY     Clerk secret key
+#   STRIPE_SECRET_KEY    Stripe secret key
+#   ... and all other variables from .env.example
+#
+# =============================================================================
+
+services:
+  # --- Application -----------------------------------------------------------
+  app:
+    image: ghcr.io/abeselom/repurpose-ai:${TAG:-latest}
+    container_name: repurpose-app
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    env_file:
+      - .env.production
+    environment:
+      - NODE_ENV=production
+      - NEXT_TELEMETRY_DISABLED=1
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: "2G"
+        reservations:
+          cpus: "0.5"
+          memory: "512M"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/.next/cache
+    networks:
+      - repurpose-network
+
+  # --- Redis (self-hosted fallback) ------------------------------------------
+  # Remove this block if using Upstash Redis or another managed service.
+  redis:
+    image: redis:7-alpine
+    container_name: repurpose-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes --save 300 1 --save 60 100
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: "256M"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - repurpose-network
+    profiles:
+      - with-redis
+
+networks:
+  repurpose-network:
+    driver: bridge
+
+volumes:
+  redis-data:

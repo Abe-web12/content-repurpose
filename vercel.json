@@ -1,0 +1,17 @@
+{
+  "name": "repurpose-ai-content",
+  "crons": [
+    {
+      "path": "/api/cron/process-posts",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/email/usage-alerts",
+      "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/cron/process-agent-queue",
+      "schedule": "0 0 * * *"
+    }
+  ]
+}

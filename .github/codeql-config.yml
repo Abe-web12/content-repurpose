@@ -1,0 +1,22 @@
+name: RepurposeAI CodeQL Configuration
+
+paths:
+  - app
+  - components
+  - lib
+  - prisma
+paths-ignore:
+  - node_modules
+  - .next
+  - out
+  - tests
+  - "**/*.test.ts"
+  - "**/*.test.tsx"
+  - "**/*.spec.ts"
+  - "**/*.spec.tsx"
+  - public
+  - scripts
+  - extension
+
+queries:
+  - uses: security-and-quality
